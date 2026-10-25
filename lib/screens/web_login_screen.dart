@@ -12,6 +12,7 @@
  * 5. 通过底层原生 CookieManager 与 JS 双重探查，自动提取包含 HttpOnly 属性的核心身份凭据 (web_session, a1, sessionid 等)。
  */
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -37,139 +38,204 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
   static const MethodChannel _channel =
       MethodChannel('com.example.douyin_downloader/floating');
 
-  /// 采用高版本桌面端 Chrome User-Agent 确保平台展示完整扫码与手机号登录窗，杜绝移动端强行跳转 APP 下载页
+  /// 抖音官方独立登录页 (/login_page) 会根据移动端 UA 自动开启原生 H5 触屏登录模式 (isH5: true)
+  static const String _mobileUserAgent =
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36';
+
+  /// 小红书 /login 仅对桌面端 UA 开放，配合 CSS 视口裁剪可在手机上仅呈现纯净登录卡片
   static const String _desktopUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36';
 
   late final WebViewController _controller;
+  Timer? _cookiePollTimer;
   bool _isLoading = true;
   String _pageTitle = '';
   bool _hasSavedSuccess = false;
+  bool _sessionPrepared = false;
+
+  /// 记录小红书未登录状态下由 /login/activate 自动下发的匿名访客 web_session，防止误判为已登录
+  final Set<String> _guestWebSessions = <String>{};
 
   @override
   void initState() {
     super.initState();
     _pageTitle = '登录 ${widget.platform.displayName}';
 
+    final userAgent = widget.platform == PlatformType.douyin
+        ? _mobileUserAgent
+        : _desktopUserAgent;
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setUserAgent(_desktopUserAgent)
+      ..setUserAgent(userAgent)
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) {
             final uri = Uri.tryParse(request.url);
-            if (uri != null && (uri.isScheme('http') || uri.isScheme('https'))) {
-              return NavigationDecision.navigate;
+            if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+              // 阻止唤醒外部应用协议 (如 xhsdiscover://, snssdk1128://, market://)
+              return NavigationDecision.prevent;
             }
-            // 阻止唤醒外部应用协议 (如 xhsdiscover://, snssdk1128://, market://)
-            return NavigationDecision.prevent;
+            // 抖音登录成功后会从 /login_page 重定向回 www.douyin.com 主站，此时立即检测并拦截重型 PC 首页加载
+            if (widget.platform == PlatformType.douyin &&
+                uri.host.contains('douyin.com') &&
+                !uri.path.contains('login') &&
+                !uri.path.contains('passport')) {
+              _autoDetectCookie(request.url);
+            }
+            return NavigationDecision.navigate;
           },
           onPageStarted: (url) {
             if (mounted) setState(() => _isLoading = true);
           },
           onPageFinished: (url) async {
             if (mounted) setState(() => _isLoading = false);
-            // 注入移动端视口自适应与优化样式
             await _injectOptimizationScripts();
-            // 自动探查 Cookie 状态
             await _autoDetectCookie(url);
           },
         ),
-      )
-      ..loadRequest(Uri.parse(widget.platform.loginUrl));
+      );
+
+    _prepareAndLoad();
   }
 
-  /// 注入视口 meta 与视口适配样式，并针对抖音自动唤起登录浮窗
+  /// 初始化前清理 WebView 残留 Cookie，确保每次进入登录页均为全新登录会话
+  Future<void> _prepareAndLoad() async {
+    try {
+      await _channel.invokeMethod('clearCookies');
+    } catch (_) {}
+    try {
+      await WebViewCookieManager().clearCookies();
+    } catch (_) {}
+
+    if (!mounted) return;
+    _sessionPrepared = true;
+    await _controller.loadRequest(Uri.parse(widget.platform.loginUrl));
+
+    // 启动轻量轮询，及时捕获短信验证码等 XHR 异步下发的 HttpOnly 登录 Cookie
+    _cookiePollTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      if (mounted && !_hasSavedSuccess && _sessionPrepared) {
+        _autoDetectCookie('');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _cookiePollTimer?.cancel();
+    super.dispose();
+  }
+
+  /// 注入移动端视口与纯净登录卡片样式适配
   Future<void> _injectOptimizationScripts() async {
     try {
-      // 1. 注入 Viewport 允许移动屏幕缩放自适应
-      await _controller.runJavaScript('''
-        (function() {
-          var meta = document.querySelector('meta[name="viewport"]');
-          if (!meta) {
-            meta = document.createElement('meta');
-            meta.name = 'viewport';
-            document.head.appendChild(meta);
-          }
-          meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes';
-        })();
-      ''');
-
-      // 2. 针对抖音：页面完全加载后，自动探查并触发“登录”按钮呼出弹窗
-      if (widget.platform == PlatformType.douyin) {
+      if (widget.platform == PlatformType.xiaohongshu) {
+        // 小红书 /login 隐藏桌面端左侧宣传海报与底部多余导航，仅居中展示手机号/扫码登录框
         await _controller.runJavaScript('''
           (function() {
-            function triggerDouyinLogin() {
-              var btn = document.getElementById('douyin_login_comp_btn_id') ||
-                Array.from(document.querySelectorAll('*')).find(function(el) {
-                  return el.children.length === 0 && el.innerText && el.innerText.trim() === '登录';
-                });
-              if (btn) {
-                btn.click();
-                return true;
-              }
-              return false;
+            var meta = document.querySelector('meta[name="viewport"]');
+            if (!meta) {
+              meta = document.createElement('meta');
+              meta.name = 'viewport';
+              document.head.appendChild(meta);
             }
-            if (!triggerDouyinLogin()) {
-              setTimeout(triggerDouyinLogin, 800);
-              setTimeout(triggerDouyinLogin, 2000);
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+
+            var styleId = 'kabu-xhs-mobile-style';
+            if (!document.getElementById(styleId)) {
+              var style = document.createElement('style');
+              style.id = styleId;
+              style.innerHTML = `
+                html, body {
+                  width: 100vw !important;
+                  min-width: 0 !important;
+                  overflow-x: hidden !important;
+                  background: #FFFFFF !important;
+                }
+                .video-container, .description-container, .left-box, .reds-modal-close {
+                  display: none !important;
+                }
+                .login-container, .reds-modal-content {
+                  width: 100vw !important;
+                  max-width: 100vw !important;
+                  min-width: 0 !important;
+                  height: auto !important;
+                  min-height: 100vh !important;
+                  margin: 0 !important;
+                  padding: 16px !important;
+                  box-shadow: none !important;
+                  border-radius: 0 !important;
+                  display: flex !important;
+                  flex-direction: column !important;
+                  justify-content: center !important;
+                  align-items: center !important;
+                }
+                .login-box-container, .right-box {
+                  width: 100% !important;
+                  max-width: 360px !important;
+                  padding: 12px 8px !important;
+                  margin: 0 auto !important;
+                }
+              `;
+              document.head.appendChild(style);
+            }
+          })();
+        ''');
+      } else if (widget.platform == PlatformType.douyin) {
+        // 抖音 /login_page 移动端全屏紧凑排版微调
+        await _controller.runJavaScript('''
+          (function() {
+            var styleId = 'kabu-dy-mobile-style';
+            if (!document.getElementById(styleId)) {
+              var style = document.createElement('style');
+              style.id = styleId;
+              style.innerHTML = `
+                html, body {
+                  width: 100vw !important;
+                  min-width: 0 !important;
+                  overflow-x: hidden !important;
+                }
+              `;
+              document.head.appendChild(style);
             }
           })();
         ''');
       }
-
-      // 3. 注入居中与弹窗样式微调
-      await _controller.runJavaScript('''
-        (function() {
-          var style = document.createElement('style');
-          style.innerHTML = `
-            /* 登录容器移动端自适应 */
-            .login-container, .douyin_login_new_class, #login-panel-new {
-              max-width: 95vw !important;
-              margin: 0 auto !important;
-            }
-          `;
-          document.head.appendChild(style);
-        })();
-      ''');
     } catch (_) {}
   }
 
-  /// 提取当前网页的完整 Cookie (通过原生 CookieManager 多域合并，支持 HttpOnly 字段)
+  /// 提取当前网页的完整 Cookie (通过原生 CookieManager 多域合并，包含 HttpOnly 核心会话字段)
   Future<String> _extractCurrentCookies() async {
     final currentUrl = await _controller.currentUrl() ?? widget.platform.loginUrl;
     final Map<String, String> mergedCookies = {};
 
     void parseInto(String cookieStr) {
-      if (cookieStr.isEmpty) return;
-      for (final pair in cookieStr.split(';')) {
-        final trimmed = pair.trim();
-        if (trimmed.isEmpty) continue;
-        final eqIdx = trimmed.indexOf('=');
-        if (eqIdx != -1) {
-          final k = trimmed.substring(0, eqIdx).trim();
-          final v = trimmed.substring(eqIdx + 1).trim();
-          if (k.isNotEmpty) mergedCookies[k] = v;
-        }
-      }
+      final parsed = CookieService.parseCookieMap(cookieStr);
+      mergedCookies.addAll(parsed);
     }
 
     try {
-      // 1. 获取当前页面 URL 的 Cookie
-      final c1 = await _channel.invokeMethod<String>('getCookies', {'url': currentUrl});
-      if (c1 != null) parseInto(c1);
+      final urlsToQuery = widget.platform == PlatformType.douyin
+          ? <String>[
+              currentUrl,
+              'https://www.douyin.com/',
+              'https://sso.douyin.com/',
+            ]
+          : <String>[
+              currentUrl,
+              'https://www.xiaohongshu.com/',
+              'https://edith.xiaohongshu.com/',
+            ];
 
-      // 2. 获取平台主域名的 Cookie (确保根域名 HttpOnly 关键凭据完整捕获)
-      final mainDomainUrl = widget.platform == PlatformType.douyin
-          ? 'https://www.douyin.com/'
-          : 'https://www.xiaohongshu.com/';
-      if (currentUrl != mainDomainUrl) {
-        final c2 = await _channel.invokeMethod<String>('getCookies', {'url': mainDomainUrl});
-        if (c2 != null) parseInto(c2);
+      for (final targetUrl in urlsToQuery.toSet()) {
+        if (targetUrl.isEmpty) continue;
+        final raw = await _channel.invokeMethod<String>('getCookies', {'url': targetUrl});
+        if (raw != null && raw.isNotEmpty) {
+          parseInto(raw);
+        }
       }
     } catch (_) {}
 
-    // 3. JS 兜底提取 document.cookie
     try {
       final jsCookie = await _controller.runJavaScriptReturningResult('document.cookie');
       final s = jsCookie.toString().replaceAll('"', '').trim();
@@ -179,62 +245,114 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
     return mergedCookies.entries.map((e) => '${e.key}=${e.value}').join('; ');
   }
 
-  /// 探查并自动提取 Cookie，若已获得有效登录态则自动保存
-  Future<void> _autoDetectCookie(String url) async {
-    if (_hasSavedSuccess) return;
-    try {
-      final cookieStr = await _extractCurrentCookies();
-      if (cookieStr.isNotEmpty) {
-        bool hasLoginToken = false;
-        if (widget.platform == PlatformType.douyin &&
-            (cookieStr.contains('sessionid') || cookieStr.contains('passport_csrf_token'))) {
-          hasLoginToken = true;
-        } else if (widget.platform == PlatformType.xiaohongshu &&
-            (cookieStr.contains('web_session') || cookieStr.contains('a1'))) {
-          hasLoginToken = true;
-        }
+  /// 严格校验当前是否真正完成了用户登录（彻底过滤未登录时的访客/CSRF/设备指纹 Cookie）
+  Future<bool> _verifyRealLoginState(String cookieStr, String currentUrl) async {
+    if (!CookieService.isAuthenticatedCookie(widget.platform, cookieStr)) {
+      return false;
+    }
 
-        if (hasLoginToken) {
-          _hasSavedSuccess = true;
-          await CookieService.saveCookie(widget.platform, cookieStr);
-          if (mounted) {
-            SnapToast.success(
-              context,
-              '${widget.platform.displayName} 账号登录成功，凭据已自动同步！',
-            );
-            Future.delayed(const Duration(milliseconds: 1200), () {
-              if (mounted) Navigator.of(context).pop(true);
-            });
-          }
+    if (widget.platform == PlatformType.douyin) {
+      // 抖音：只有真正登录成功后才会由服务端下发 HttpOnly 的 sessionid / sessionid_ss / sid_tt / uid_tt
+      return true;
+    }
+
+    if (widget.platform == PlatformType.xiaohongshu) {
+      final cookieMap = CookieService.parseCookieMap(cookieStr);
+      final webSession = cookieMap['web_session'] ?? '';
+      if (webSession.length < 20) return false;
+
+      final uri = Uri.tryParse(currentUrl);
+      final isStillOnLoginPage = uri == null || uri.path.startsWith('/login');
+
+      // 检查页面 JS 状态是否已标记为用户登录
+      bool jsLoggedIn = false;
+      try {
+        final res = await _controller.runJavaScriptReturningResult('''
+          (function() {
+            try {
+              if (window.__INITIAL_STATE__ &&
+                  window.__INITIAL_STATE__.user &&
+                  window.__INITIAL_STATE__.user.loggedIn) {
+                var v = window.__INITIAL_STATE__.user.loggedIn;
+                return (v === true || v._value === true || v.value === true) ? 'true' : 'false';
+              }
+            } catch (e) {}
+            return 'false';
+          })()
+        ''');
+        jsLoggedIn = res.toString().replaceAll('"', '').trim() == 'true';
+      } catch (_) {}
+
+      if (isStillOnLoginPage && !jsLoggedIn) {
+        // 小红书在进入 /login 页面时会通过 /api/sns/web/v1/login/activate 下发匿名访客 web_session
+        // 将该未登录态的访客 web_session 加入黑名单，绝不触发误报登录
+        _guestWebSessions.add(webSession);
+        return false;
+      }
+
+      if (_guestWebSessions.contains(webSession)) {
+        return false;
+      }
+
+      return !isStillOnLoginPage || jsLoggedIn;
+    }
+
+    return false;
+  }
+
+  /// 探查并自动提取 Cookie，仅当确认已获得真实用户登录态时才自动保存并退出
+  Future<void> _autoDetectCookie(String urlHint) async {
+    if (_hasSavedSuccess || !_sessionPrepared) return;
+    try {
+      final currentUrl = urlHint.isNotEmpty
+          ? urlHint
+          : (await _controller.currentUrl() ?? widget.platform.loginUrl);
+      final cookieStr = await _extractCurrentCookies();
+      if (cookieStr.isEmpty) return;
+
+      final isLoggedIn = await _verifyRealLoginState(cookieStr, currentUrl);
+      if (isLoggedIn && !_hasSavedSuccess) {
+        _hasSavedSuccess = true;
+        _cookiePollTimer?.cancel();
+        await CookieService.saveCookie(widget.platform, cookieStr);
+        if (mounted) {
+          SnapToast.success(
+            context,
+            '${widget.platform.displayName} 账号登录成功，凭据已自动同步！',
+          );
+          Future.delayed(const Duration(milliseconds: 900), () {
+            if (mounted) Navigator.of(context).pop(true);
+          });
         }
       }
     } catch (_) {}
   }
 
-  /// 手动确认提取 Cookie
+  /// 手动点击“完成登录”按钮提取并校验 Cookie
   Future<void> _manualSaveCookie() async {
     try {
+      final currentUrl = await _controller.currentUrl() ?? widget.platform.loginUrl;
       final cookieStr = await _extractCurrentCookies();
 
       if (cookieStr.trim().isEmpty) {
-        _showSnack('暂未检测到 Cookie 凭据，请先在页面完成登录');
+        _showSnack('尚未检测到登录状态，请先在页面内完成登录', isError: true);
         return;
       }
 
-      final hasLoginToken = (widget.platform == PlatformType.douyin &&
-              (cookieStr.contains('sessionid') || cookieStr.contains('passport_csrf_token'))) ||
-          (widget.platform == PlatformType.xiaohongshu &&
-              (cookieStr.contains('web_session') || cookieStr.contains('a1')));
+      final isLoggedIn = await _verifyRealLoginState(cookieStr, currentUrl);
+      if (!isLoggedIn) {
+        _showSnack('尚未检测到有效登录凭据，请先完成手机号验证码或扫码登录', isError: true);
+        return;
+      }
 
-      await CookieService.saveCookie(widget.platform, cookieStr);
       _hasSavedSuccess = true;
+      _cookiePollTimer?.cancel();
+      await CookieService.saveCookie(widget.platform, cookieStr);
 
       if (mounted) {
         SnapToast.success(
           context,
-          hasLoginToken
-              ? '${widget.platform.displayName} 凭据保存成功！已启用高清原画解析'
-              : '${widget.platform.displayName} Cookie 已保存（访客模式）',
+          '${widget.platform.displayName} 登录凭据保存成功！已启用高清原画解析',
         );
         Navigator.of(context).pop(true);
       }
@@ -285,28 +403,61 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
       bottomBarHeight: 54,
       bottomBar: FloatingPill(
         height: 54,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                '支持短信验证码或扫码，登录后自动保存',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AirbnbTheme.textSecondary,
-                ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.security_rounded,
+                    size: 16,
+                    color: AirbnbTheme.textSecondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '支持短信验证码或扫码，登录后自动保存',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AirbnbTheme.textSecondary,
+                        height: 1.25,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
-            ElevatedButton.icon(
-              onPressed: _manualSaveCookie,
-              icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
-              label: const Text('完成登录'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AirbnbTheme.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AirbnbTheme.radiusCapsule),
+            const SizedBox(width: 10),
+            SizedBox(
+              height: 38,
+              child: ElevatedButton(
+                onPressed: _manualSaveCookie,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AirbnbTheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AirbnbTheme.radiusCapsule),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle_outline_rounded, size: 16, color: Colors.white),
+                    SizedBox(width: 5),
+                    Text(
+                      '完成登录',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

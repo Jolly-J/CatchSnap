@@ -57,7 +57,7 @@ enum PlatformType {
   String get loginUrl {
     switch (this) {
       case PlatformType.douyin:
-        return 'https://www.douyin.com/';
+        return 'https://www.douyin.com/login_page?service=https%3A%2F%2Fwww.douyin.com%2F';
       case PlatformType.xiaohongshu:
         return 'https://www.xiaohongshu.com/login';
       case PlatformType.wechat:

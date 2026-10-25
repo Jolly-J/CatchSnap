@@ -280,11 +280,48 @@ class DouyinParser extends BaseParser {
     }
 
     final streams = <VideoStream>[];
+    final rawWidth = (video['width'] as int?) ?? 0;
+    final rawHeight = (video['height'] as int?) ?? 0;
+
+    int w1080 = 1080;
+    int h1080 = 1920;
+    int w720 = 720;
+    int h720 = 1280;
+
+    if (rawWidth > 0 && rawHeight > 0) {
+      if (rawHeight >= rawWidth) {
+        w1080 = 1080;
+        h1080 = (1080 * rawHeight / rawWidth).round();
+        w720 = 720;
+        h720 = (720 * rawHeight / rawWidth).round();
+      } else {
+        h1080 = 1080;
+        w1080 = (1080 * rawWidth / rawHeight).round();
+        h720 = 720;
+        w720 = (720 * rawWidth / rawHeight).round();
+      }
+    }
+
     if (video1080p.isNotEmpty) {
-      streams.add(VideoStream(gearName: '1080p 超清原画', url: video1080p));
+      streams.add(VideoStream(
+        gearName: '超清',
+        url: video1080p,
+        width: w1080,
+        height: h1080,
+        codec: 'H.264',
+        bitrate: 4000000,
+        badge: '超清推荐',
+      ));
     }
     if (video720p.isNotEmpty && video720p != video1080p) {
-      streams.add(VideoStream(gearName: '720p 高清', url: video720p));
+      streams.add(VideoStream(
+        gearName: '高清',
+        url: video720p,
+        width: w720,
+        height: h720,
+        codec: 'H.264',
+        bitrate: 2000000,
+      ));
     }
 
     // 封面提取

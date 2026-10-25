@@ -15,6 +15,7 @@ import '../core/security_storage.dart';
 import '../models/download_task.dart';
 import '../models/media_item.dart';
 import '../utils/format_utils.dart';
+import '../utils/motion_photo_synthesizer.dart';
 import 'history_service.dart';
 import 'permission_service.dart';
 import 'system_notification_service.dart';
@@ -94,12 +95,14 @@ class DownloadTaskManager {
       throw Exception('图集中无可用图片');
     }
 
+    final isLive = item.isLivePhoto && item.livePhotoClips.any((c) => c.isNotEmpty);
+    final taskTitleDesc = isLive ? '(${images.length}张实况照片)' : '(${images.length}张图片)';
     final taskId = '${DateTime.now().millisecondsSinceEpoch}_${item.id}_gallery';
     final task = DownloadTask(
       taskId: taskId,
       mediaItem: item,
       downloadUrl: images.first,
-      fileName: '${item.title} (${images.length}张图片)',
+      fileName: '${item.title} $taskTitleDesc',
       status: TaskStatus.downloading,
       createdAt: DateTime.now(),
     );
@@ -210,17 +213,19 @@ class DownloadTaskManager {
     }
   }
 
-  /// 执行图集批量任务
+  /// 执行图集或实况照片批量任务
   Future<void> _runGalleryTask(DownloadTask task, List<String> images) async {
     final taskId = task.taskId;
     final item = task.mediaItem;
+    final isLive = item.isLivePhoto && item.livePhotoClips.any((c) => c.isNotEmpty);
+    final total = images.length;
 
     final liveEnabled = await SecurityStorage.isFluidCloudEnabled();
     if (liveEnabled) {
       await LiveActivityService.start(
-        title: '图集: ${item.title}',
+        title: isLive ? '实况照片: ${item.title}' : '图集: ${item.title}',
         progress: 0.0,
-        speed: '0/${images.length}',
+        speed: '0/$total',
       );
     }
 
@@ -230,10 +235,10 @@ class DownloadTaskManager {
     final threads = await SecurityStorage.getDownloadThreads();
 
     try {
-      for (int i = 0; i < images.length; i++) {
+      for (int i = 0; i < total; i++) {
         if (_cancelFlags[taskId] == true) throw Exception('TASK_CANCELED');
 
-        final url = images[i].startsWith('http://')
+        final imgUrl = images[i].startsWith('http://')
             ? images[i].replaceFirst('http://', 'https://')
             : images[i];
 
@@ -245,28 +250,48 @@ class DownloadTaskManager {
           seq: i + 1,
         );
 
-        final tempFilePath = '${tmpDir.path}/$singleFileName';
-        final tempFile = File(tempFilePath);
+        final hasClip = isLive &&
+            i < item.livePhotoClips.length &&
+            item.livePhotoClips[i].isNotEmpty;
+        final clipUrl = hasClip
+            ? (item.livePhotoClips[i].startsWith('http://')
+                ? item.livePhotoClips[i].replaceFirst('http://', 'https://')
+                : item.livePhotoClips[i])
+            : '';
+
+        final ts = DateTime.now().millisecondsSinceEpoch;
+        final tempImgPath = '${tmpDir.path}/tmp_img_${ts}_${i + 1}.jpg';
+        final tempClipPath = '${tmpDir.path}/tmp_clip_${ts}_${i + 1}.mp4';
+        final tempMotionPath = '${tmpDir.path}/$singleFileName';
+
+        final tempImgFile = File(tempImgPath);
+        final tempClipFile = File(tempClipPath);
+        final tempMotionFile = File(tempMotionPath);
 
         try {
-          // 切换到下一张图片时立即同步一次总进度
-          final startOverallProgress = i / images.length;
-          final startSpeedStr = '正在下载 (${i + 1}/${images.length})';
+          final startOverallProgress = i / total;
+          final startSpeedStr = hasClip
+              ? '正在保存实况照片 (${i + 1}/$total)'
+              : '正在保存高清照片 (${i + 1}/$total)';
           if (liveEnabled) {
             LiveActivityService.update(progress: startOverallProgress, speed: startSpeedStr);
           }
 
+          final referer = item.platform.name == 'xiaohongshu'
+              ? 'https://www.xiaohongshu.com/'
+              : 'https://www.douyin.com/';
+
+          // 1. 下载静态高清大图
           await DownloadEngine.instance.download(
-            url: url,
-            destPath: tempFilePath,
+            url: imgUrl,
+            destPath: tempImgPath,
             concurrency: threads,
-            headers: {'Referer': 'https://www.xiaohongshu.com/'},
-            onProgress: (downloaded, total, speedBytes) {
-              if (_cancelFlags[taskId] == true) {
-                throw Exception('TASK_CANCELED');
-              }
-              final overallProgress = (i + (total > 0 ? downloaded / total : 0.5)) / images.length;
-              final speedStr = '${FormatUtils.formatSpeed(speedBytes)} (${i + 1}/${images.length})';
+            headers: {'Referer': referer},
+            onProgress: (downloaded, totalBytes, speedBytes) {
+              if (_cancelFlags[taskId] == true) throw Exception('TASK_CANCELED');
+              final itemProgress = (totalBytes > 0 ? downloaded / totalBytes : 0.5) * (hasClip ? 0.6 : 1.0);
+              final overallProgress = (i + itemProgress) / total;
+              final speedStr = '${FormatUtils.formatSpeed(speedBytes)} (${i + 1}/$total)';
 
               final idx = _activeTasks.indexWhere((t) => t.taskId == taskId);
               if (idx != -1) {
@@ -279,23 +304,70 @@ class DownloadTaskManager {
               }
 
               if (liveEnabled) {
-                LiveActivityService.update(
-                  progress: overallProgress,
-                  speed: speedStr,
-                );
+                LiveActivityService.update(progress: overallProgress, speed: speedStr);
               }
             },
           );
 
+          // 2. 如果包含实况动视频切片，下载切片并合成单一标准的 Motion Photo (.jpg)
+          if (hasClip) {
+            await DownloadEngine.instance.download(
+              url: clipUrl,
+              destPath: tempClipPath,
+              concurrency: threads,
+              headers: {'Referer': referer},
+              onProgress: (downloaded, totalBytes, speedBytes) {
+                if (_cancelFlags[taskId] == true) throw Exception('TASK_CANCELED');
+                final itemProgress = 0.6 + (totalBytes > 0 ? downloaded / totalBytes : 0.5) * 0.4;
+                final overallProgress = (i + itemProgress) / total;
+                final speedStr = '${FormatUtils.formatSpeed(speedBytes)} (${i + 1}/$total)';
+
+                final idx = _activeTasks.indexWhere((t) => t.taskId == taskId);
+                if (idx != -1) {
+                  _activeTasks[idx] = _activeTasks[idx].copyWith(
+                    downloadedBytes: (overallProgress * 100).toInt(),
+                    totalBytes: 100,
+                    speedBytesPerSecond: speedBytes,
+                  );
+                  _notifyChange();
+                }
+
+                if (liveEnabled) {
+                  LiveActivityService.update(progress: overallProgress, speed: speedStr);
+                }
+              },
+            );
+
+            // 合成为 Google Motion Photo 1.0 规范的单张实况照片
+            await MotionPhotoSynthesizer.synthesize(
+              imageFile: tempImgFile,
+              videoFile: tempClipFile,
+              outputFile: tempMotionFile,
+            );
+          }
+
+          // 3. 写入系统相册媒体库（实况照片依然是单张 .jpg 文件入库，长按即可播放动图与声音）
+          final fileToSave = hasClip ? tempMotionFile : tempImgFile;
           await _channel.invokeMethod('saveFileToGallery', {
-            'filePath': tempFilePath,
+            'filePath': fileToSave.path,
             'albumName': targetAlbum,
             'fileName': singleFileName,
           });
         } finally {
-          if (await tempFile.exists()) {
+          // 清理所有临时文件
+          if (await tempImgFile.exists()) {
             try {
-              await tempFile.delete();
+              await tempImgFile.delete();
+            } catch (_) {}
+          }
+          if (await tempClipFile.exists()) {
+            try {
+              await tempClipFile.delete();
+            } catch (_) {}
+          }
+          if (await tempMotionFile.exists()) {
+            try {
+              await tempMotionFile.delete();
             } catch (_) {}
           }
         }
@@ -309,7 +381,7 @@ class DownloadTaskManager {
     } catch (e) {
       if (_cancelFlags[taskId] == true) {
         if (liveEnabled) {
-          LiveActivityService.stop(isSuccess: false, title: '已取消图集下载');
+          LiveActivityService.stop(isSuccess: false, title: isLive ? '已取消实况照片保存' : '已取消图集下载');
         }
         _finishTask(taskId, isCanceled: true);
       } else {
@@ -369,6 +441,7 @@ class DownloadTaskManager {
     required String title,
     required String author,
     int? seq,
+    String? suffix,
   }) {
     final now = DateTime.now();
     final ts =
@@ -379,6 +452,7 @@ class DownloadTaskManager {
 
     final parts = [prefix, ts];
     if (seq != null) parts.add('$seq');
+    if (suffix != null && suffix.isNotEmpty) parts.add(suffix);
     if (shortTitle.isNotEmpty) parts.add(shortTitle);
     if (cleanAuthor.isNotEmpty) parts.add(cleanAuthor);
 

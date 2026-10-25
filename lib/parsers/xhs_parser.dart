@@ -176,8 +176,23 @@ class XhsParser extends BaseParser {
     // 兼容桌面端 noteDetailMap 与移动端 noteData
     final noteMap = (state['note']?['noteDetailMap'] as Map<String, dynamic>?) ?? {};
     final noteContainer = noteMap[noteId] as Map<String, dynamic>?;
-    final note = noteContainer?['note'] as Map<String, dynamic>? ??
+    Map<String, dynamic>? note = noteContainer?['note'] as Map<String, dynamic>? ??
         state['noteData']?['data']?['noteData'] as Map<String, dynamic>?;
+
+    // 兜底：兼容新版 SSR 注入的 __SETUP_SERVER_STATE__
+    if (note == null) {
+      final setupMatch = RegExp(
+        r'window\.__SETUP_SERVER_STATE__\s*=\s*(.*?)</script>',
+        dotAll: true,
+      ).firstMatch(resp.body);
+      if (setupMatch != null) {
+        try {
+          String setupJson = setupMatch.group(1)!.trim().replaceAll(':undefined', ':null');
+          final setupState = json.decode(setupJson) as Map<String, dynamic>;
+          note = setupState['LAUNCHER_SSR_STORE_PAGE_DATA']?['noteData'] as Map<String, dynamic>?;
+        } catch (_) {}
+      }
+    }
 
     if (note == null) {
       throw Exception('未找到小红书笔记数据，可能是私密笔记或需登录验证');
@@ -205,36 +220,170 @@ class XhsParser extends BaseParser {
       final media = (videoObj['media'] as Map<String, dynamic>?) ?? {};
       final streamObj = (media['stream'] as Map<String, dynamic>?) ?? {};
 
-      // 提取 h264 或 h265 流
+      // 解析 mediaV2 或 capa 中的原始主视频分辨率与时长
+      int origWidth = 0;
+      int origHeight = 0;
+      final capaDuration = (videoObj['capa'] as Map<String, dynamic>?)?['duration'] as int? ?? 0;
+      if (capaDuration > 0) {
+        duration = capaDuration * 1000;
+      }
+      final mediaV2Raw = videoObj['mediaV2'];
+      if (mediaV2Raw is String && mediaV2Raw.isNotEmpty) {
+        try {
+          final mv2 = json.decode(mediaV2Raw) as Map<String, dynamic>;
+          final mv2Video = mv2['video'] as Map<String, dynamic>?;
+          if (mv2Video != null) {
+            origWidth = mv2Video['width'] as int? ?? 0;
+            origHeight = mv2Video['height'] as int? ?? 0;
+            final mv2Dur = mv2Video['duration'] as int? ?? 0;
+            if (mv2Dur > 0 && duration == 0) {
+              duration = mv2Dur * 1000;
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 1. 创作者上传的原始无水印母带 (consumer.originVideoKey)
+      final originKey = (videoObj['consumer'] as Map<String, dynamic>?)?['originVideoKey'] as String? ?? '';
+      // Android MediaCodec H.264 硬件解码器硬性限制单边分辨率不得超过 4096 (如 2160x4320 会导致系统相册解码失败)
+      final bool isUltraResolution = (origWidth > 4096 || origHeight > 4096);
+      VideoStream? ultraOriginStream;
+
+      if (originKey.isNotEmpty) {
+        final originUrl = 'https://sns-video-bd.xhscdn.com/$originKey';
+        final backupOriginUrl = 'https://sns-video-al.xhscdn.com/$originKey';
+
+        if (!isUltraResolution) {
+          primaryVideoUrl = originUrl;
+          streams.add(
+            VideoStream(
+              gearName: '原画',
+              url: originUrl,
+              width: origWidth,
+              height: origHeight,
+              codec: 'H.264',
+              bitrate: 10000000,
+              badge: '原画推荐',
+              backupUrl: backupOriginUrl,
+            ),
+          );
+        } else {
+          // 超过 4096 极客母带：保留选项但备注需第三方播放器支持，默认下载流回退为兼容移动端的高清转码流
+          ultraOriginStream = VideoStream(
+            gearName: '原画',
+            url: originUrl,
+            width: origWidth,
+            height: origHeight,
+            codec: 'H.264',
+            bitrate: 10000000,
+            badge: '8K超限',
+            warningNote: '单边分辨率超4K，部分手机相册无法解码，建议使用第三方播放器',
+            backupUrl: backupOriginUrl,
+          );
+        }
+      }
+
+      // 2. 次级流：提取 stream 中的转码流（按码率从高到低排序，完美兼容全机型相册解码）
       final h264List = (streamObj['h264'] as List?) ?? [];
       final h265List = (streamObj['h265'] as List?) ?? [];
-      final allStreams = [...h264List, ...h265List];
+      final av1List = (streamObj['av1'] as List?) ?? [];
+      final allStreams = [...h265List, ...av1List, ...h264List]
+          .whereType<Map<String, dynamic>>()
+          .toList()
+        ..sort((a, b) {
+          final ba = (a['avgBitrate'] as int?) ?? (a['videoBitrate'] as int?) ?? 0;
+          final bb = (b['avgBitrate'] as int?) ?? (b['videoBitrate'] as int?) ?? 0;
+          return bb.compareTo(ba);
+        });
 
-      for (final s in allStreams) {
-        final sMap = s as Map<String, dynamic>;
+      // 去重并规范化生成各个转码流
+      final seenKeys = <String>{};
+      final streamCandidates = <VideoStream>[];
+
+      for (final sMap in allStreams) {
         String mUrl = sMap['masterUrl'] as String? ?? '';
         if (mUrl.startsWith('http://')) {
           mUrl = mUrl.replaceFirst('http://', 'https://');
         }
-        final qType = sMap['qualityType'] as String? ?? '';
-        final bitrate = sMap['videoBitrate'] as int? ?? 0;
-        final d = sMap['videoDuration'] as int? ?? 0;
+        if (mUrl.isEmpty) continue;
+
+        int w = sMap['width'] as int? ?? 0;
+        int h = sMap['height'] as int? ?? 0;
+        if ((w == 0 || h == 0) && origWidth > 0 && origHeight > 0) {
+          if (origHeight >= origWidth) {
+            w = 720;
+            h = (720 * origHeight / origWidth).round();
+          } else {
+            h = 720;
+            w = (720 * origWidth / origHeight).round();
+          }
+        }
+        // 若仍为 0，给保底竖屏分辨率
+        if (w == 0 || h == 0) {
+          w = 720;
+          h = 960;
+        }
+
+        final codecRaw = (sMap['videoCodec'] as String? ?? sMap['video_codec'] as String? ?? '').toLowerCase();
+        final codec = (codecRaw == 'hevc' || codecRaw == 'h265')
+            ? 'HEVC'
+            : (codecRaw == 'av1' ? 'AV1' : 'H.264');
+        final bitrate = (sMap['avgBitrate'] as int?) ?? (sMap['videoBitrate'] as int?) ?? 0;
+        final sizeBytes = (sMap['size'] as int?) ?? 0;
+        final d = (sMap['duration'] as int?) ?? (sMap['videoDuration'] as int?) ?? 0;
         if (d > duration) duration = d;
 
-        if (mUrl.isNotEmpty) {
-          final gear = _formatGear(qType, bitrate);
-          streams.add(VideoStream(gearName: gear, url: mUrl, bitrate: bitrate));
-          if (primaryVideoUrl.isEmpty) primaryVideoUrl = mUrl;
+        // 去除完全相同分辨率和编码的冗余流
+        final key = '$w-$h-$codec';
+        if (seenKeys.contains(key)) continue;
+        seenKeys.add(key);
+
+        // 左侧仅显示清晰简洁的画质级别（超清、高清、标清）
+        final shortDim = w < h ? w : h;
+        String baseName = '高清';
+        if (shortDim >= 1080) {
+          baseName = '超清';
+        } else if (shortDim >= 720) {
+          baseName = '高清';
+        } else {
+          baseName = '标清';
         }
+
+        streamCandidates.add(
+          VideoStream(
+            gearName: baseName,
+            url: mUrl,
+            width: w,
+            height: h,
+            codec: codec,
+            bitrate: bitrate,
+            sizeBytes: sizeBytes,
+          ),
+        );
       }
 
-      // 如果 stream 中未获取到，尝试从 consumer key 兜底
-      if (primaryVideoUrl.isEmpty) {
-        final key = videoObj['consumer']?['originVideoKey'] as String? ?? '';
-        if (key.isNotEmpty) {
-          primaryVideoUrl = 'https://sns-video-bd.xhscdn.com/$key';
-          streams.add(VideoStream(gearName: '原始无水印视频', url: primaryVideoUrl));
-        }
+      for (int i = 0; i < streamCandidates.length; i++) {
+        final s = streamCandidates[i];
+        final isDefault = primaryVideoUrl.isEmpty;
+        if (isDefault) primaryVideoUrl = s.url;
+
+        streams.add(
+          VideoStream(
+            gearName: s.gearName,
+            url: s.url,
+            width: s.width,
+            height: s.height,
+            codec: s.codec,
+            bitrate: s.bitrate,
+            sizeBytes: s.sizeBytes,
+            badge: isDefault ? '推荐' : null,
+          ),
+        );
+      }
+
+      // 若存在超限母带，追加到流列表末尾供高级用户手动选择
+      if (ultraOriginStream != null) {
+        streams.add(ultraOriginStream);
       }
     }
 
@@ -259,15 +408,21 @@ class XhsParser extends BaseParser {
 
       // 检查 LivePhoto 实况动图 (兼容 stream 与 media.stream 两种层级)
       final livePhoto = imgMap['livePhoto'] as bool? ?? false;
+      String clipUrl = '';
       if (livePhoto) {
-        isLive = true;
-        String clipUrl = imgMap['stream']?['h264']?[0]?['masterUrl'] as String? ??
+        clipUrl = imgMap['stream']?['h264']?[0]?['masterUrl'] as String? ??
             imgMap['media']?['stream']?['h264']?[0]?['masterUrl'] as String? ??
             '';
         if (clipUrl.startsWith('http://')) {
           clipUrl = clipUrl.replaceFirst('http://', 'https://');
         }
-        if (clipUrl.isNotEmpty) liveClips.add(clipUrl);
+        if (clipUrl.isNotEmpty) {
+          isLive = true;
+        }
+      }
+      // 保持与 images 索引一一对齐（非实况图存空字符串）
+      if (!isVideo) {
+        liveClips.add(clipUrl);
       }
     }
 
@@ -377,9 +532,5 @@ class XhsParser extends BaseParser {
     return int.tryParse(s) ?? 0;
   }
 
-  String _formatGear(String qualityType, int bitrate) {
-    if (qualityType.contains('1080') || bitrate > 3000000) return '1080p 超清原画';
-    if (qualityType.contains('720') || bitrate > 1500000) return '720p 高清';
-    return qualityType.isNotEmpty ? qualityType : '默认画质';
-  }
+
 }

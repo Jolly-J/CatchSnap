@@ -8,26 +8,62 @@
 import 'platform_type.dart';
 
 class VideoStream {
-  final String gearName; // 如 "1080p 高清", "720p 标清", "4K 超清"
+  final String gearName; // 如 "1080p 超清", "720p 高清", "原画无水印"
   final String url;
   final int bitrate;
+  final int width;
+  final int height;
+  final String codec; // 如 "H.264", "HEVC"
+  final int sizeBytes;
+  final String? badge; // 如 "推荐", "无水印原画", "8K超限"
+  final String? warningNote; // 如 "单边分辨率超4K，部分手机相册无法解码"
+  final String? backupUrl; // 备用 CDN 播放链接
 
   const VideoStream({
     required this.gearName,
     required this.url,
     this.bitrate = 0,
+    this.width = 0,
+    this.height = 0,
+    this.codec = '',
+    this.sizeBytes = 0,
+    this.badge,
+    this.warningNote,
+    this.backupUrl,
   });
+
+  /// 获取标准格式化分辨率标签文本，如 "1080×1920"
+  String get resolutionText {
+    if (width > 0 && height > 0) {
+      return '$width×$height';
+    }
+    return '';
+  }
 
   Map<String, dynamic> toJson() => {
         'gearName': gearName,
         'url': url,
         'bitrate': bitrate,
+        'width': width,
+        'height': height,
+        'codec': codec,
+        'sizeBytes': sizeBytes,
+        'badge': badge,
+        'warningNote': warningNote,
+        'backupUrl': backupUrl,
       };
 
   factory VideoStream.fromJson(Map<String, dynamic> json) => VideoStream(
         gearName: json['gearName'] as String? ?? '默认画质',
         url: json['url'] as String? ?? '',
         bitrate: json['bitrate'] as int? ?? 0,
+        width: json['width'] as int? ?? 0,
+        height: json['height'] as int? ?? 0,
+        codec: json['codec'] as String? ?? '',
+        sizeBytes: json['sizeBytes'] as int? ?? 0,
+        badge: json['badge'] as String?,
+        warningNote: json['warningNote'] as String?,
+        backupUrl: json['backupUrl'] as String?,
       );
 }
 
@@ -77,8 +113,8 @@ class MediaItem {
   /// 是否为纯视频类型（具有视频流或视频链接即优先判定为视频）
   bool get isVideo => (videoUrl.isNotEmpty || videoStreams.isNotEmpty) && !isLivePhoto;
 
-  /// 是否为图集类型（非视频且具有图片集合）
-  bool get isGallery => !isVideo && images.isNotEmpty && !isLivePhoto;
+  /// 是否为图集或实况图集类型（非纯视频且具有图片集合）
+  bool get isGallery => !isVideo && images.isNotEmpty;
 
   Map<String, dynamic> toJson() => {
         'id': id,

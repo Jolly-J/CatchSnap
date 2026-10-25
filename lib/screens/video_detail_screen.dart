@@ -18,6 +18,14 @@ import '../widgets/floating_top_bar.dart';
 import '../widgets/snap_toast.dart';
 import 'history_screen.dart';
 
+
+enum _DetailTagType {
+  codec,       // 次要规格：淡灰低调
+  resolution,  // 核心分辨率：清爽蓝灰
+  recommended, // 重点推荐：品牌粉红高亮
+  warning,     // 风险警示：琥珀橙高亮
+}
+
 class VideoDetailScreen extends StatefulWidget {
   final MediaItem item;
 
@@ -89,7 +97,10 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
         item: widget.item,
       );
       if (mounted) {
-        _showSnack('已加入图集后台批量下载！', isSuccess: true);
+        _showSnack(
+          widget.item.isLivePhoto ? '已加入实况照片后台保存！' : '已加入图集后台批量下载！',
+          isSuccess: true,
+        );
         Navigator.of(context).pop(true);
       }
     } catch (e) {
@@ -109,6 +120,91 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
     } else {
       SnapToast.info(context, msg);
     }
+  }
+
+
+  /// 统一高度、统一圆角规范的画质标签组件（通过颜色引导用户关注焦点）
+  Widget _buildTag({
+    required String text,
+    required _DetailTagType type,
+  }) {
+    Color bg;
+    Color textColor;
+    Color borderColor;
+    FontWeight fontWeight = FontWeight.w600;
+
+    switch (type) {
+      case _DetailTagType.codec:
+        // 次要编码规格：采用中性浅灰，弱化视觉噪音
+        bg = const Color(0xFFF1F5F9);
+        textColor = const Color(0xFF64748B);
+        borderColor = const Color(0xFFE2E8F0);
+        fontWeight = FontWeight.w500;
+        break;
+      case _DetailTagType.resolution:
+        // 核心分辨率规格：采用高辨识度的精致蓝灰底与深色字
+        bg = const Color(0xFFE2E8F0);
+        textColor = const Color(0xFF1E293B);
+        borderColor = const Color(0xFFCBD5E1);
+        break;
+      case _DetailTagType.recommended:
+        // 重点推荐关注：爱彼迎品牌珊瑚粉，强视觉焦点
+        bg = const Color(0xFFFFF0F2);
+        textColor = AirbnbTheme.primary;
+        borderColor = const Color(0xFFFFD1D8);
+        fontWeight = FontWeight.w700;
+        break;
+      case _DetailTagType.warning:
+        // 警告/超限风险：醒目琥珀橙，提示系统兼容性
+        bg = const Color(0xFFFFFBEB);
+        textColor = const Color(0xFFD97706);
+        borderColor = const Color(0xFFFDE68A);
+        fontWeight = FontWeight.w700;
+        break;
+    }
+
+    return Container(
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 7),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: borderColor, width: 0.6),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: fontWeight,
+          color: textColor,
+          height: 1.1,
+          letterSpacing: -0.2,
+        ),
+      ),
+    );
+  }
+
+  /// 提取标准分辨率文本兜底
+  String _getResolutionText(VideoStream stream) {
+    if (stream.resolutionText.isNotEmpty) {
+      return stream.resolutionText;
+    }
+    final name = stream.gearName;
+    if (name.contains('1080')) return '1080×1920';
+    if (name.contains('720')) return '720×1280';
+    if (name.contains('4K')) return '2160×3840';
+    if (name.contains('2K')) return '1440×2560';
+    return '720×960';
+  }
+
+  /// 纯净归一化主标题（去除与右侧标签重复的 720p/HEVC/H.264，左侧仅保留清晰级名称：超清、高清、原画、标清）
+  String _simplifyGearName(String raw) {
+    if (raw.contains('原画')) return '原画';
+    if (raw.contains('超清') || raw.contains('1080') || raw.contains('2K') || raw.contains('4K')) return '超清';
+    if (raw.contains('高清') || raw.contains('720')) return '高清';
+    if (raw.contains('标清') || raw.contains('540')) return '标清';
+    return raw;
   }
 
   @override
@@ -183,7 +279,9 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
               onPressed: _isDownloading ? null : _startDownloadVideo,
             )
           : AirbnbButton(
-              text: '一键保存全部图集 (${item.images.length}张)',
+              text: item.isLivePhoto
+                  ? '一键保存实况照片 (${item.images.length}张)'
+                  : '一键保存全部图集 (${item.images.length}张)',
               isLoading: _isDownloading,
               onPressed: _isDownloading ? null : _startDownloadImages,
             ),
@@ -273,6 +371,33 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
+                        ),
+                      ),
+                    ),
+                  if (item.isLivePhoto)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(AirbnbTheme.radiusCapsule),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.motion_photos_on_rounded, color: Colors.white, size: 14),
+                            SizedBox(width: 4),
+                            Text(
+                              '实况动图',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -369,63 +494,137 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
               ),
               const SizedBox(height: 10),
               AirbnbCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Column(
-                  children: item.videoStreams.map((stream) {
+                  children: List.generate(item.videoStreams.length, (index) {
+                    final stream = item.videoStreams[index];
                     final selected = _selectedStream == stream;
                     final isRecommended = stream == item.videoStreams.first;
-                    return InkWell(
-                      onTap: () => setState(() => _selectedStream = stream),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(
-                          children: [
-                            Icon(
-                              selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                              color: selected ? AirbnbTheme.primary : AirbnbTheme.textTertiary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                stream.gearName,
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                                  color: AirbnbTheme.textMain,
+                    final isLast = index == item.videoStreams.length - 1;
+
+                    return Column(
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () => setState(() => _selectedStream = stream),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                                      color: selected ? AirbnbTheme.primary : AirbnbTheme.textTertiary,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    // 主标题居左：仅保留纯净级别（原画、超清、高清、标清），杜绝与右侧标签信息重复
+                                    Expanded(
+                                      child: Text(
+                                        _simplifyGearName(stream.gearName),
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                                          color: AirbnbTheme.textMain,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // 标签全量居右：高度一致、风格统一、颜色引导重点
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        _buildTag(
+                                          text: _getResolutionText(stream),
+                                          type: _DetailTagType.resolution,
+                                        ),
+                                        if (stream.codec.isNotEmpty) ...[
+                                          const SizedBox(width: 5),
+                                          _buildTag(
+                                            text: stream.codec,
+                                            type: _DetailTagType.codec,
+                                          ),
+                                        ],
+                                        if (stream.badge != null && stream.badge!.isNotEmpty) ...[
+                                          const SizedBox(width: 5),
+                                          _buildTag(
+                                            text: stream.badge!,
+                                            type: stream.badge!.contains('超限')
+                                                ? _DetailTagType.warning
+                                                : _DetailTagType.recommended,
+                                          ),
+                                        ] else if (isRecommended) ...[
+                                          const SizedBox(width: 5),
+                                          _buildTag(
+                                            text: '推荐',
+                                            type: _DetailTagType.recommended,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ),
-                            if (isRecommended)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AirbnbTheme.primaryLight,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  '推荐',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: AirbnbTheme.primary,
-                                    fontWeight: FontWeight.bold,
+                                // 警示栏：图标居上，与主文本平齐
+                                if (stream.warningNote != null && stream.warningNote!.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 30),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFFBEB),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFFDE68A), width: 0.8),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Padding(
+                                          padding: EdgeInsets.only(top: 1.5),
+                                          child: Icon(
+                                            Icons.warning_amber_rounded,
+                                            size: 15,
+                                            color: Color(0xFFD97706),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            stream.warningNote!,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFFB45309),
+                                              height: 1.35,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ),
-                          ],
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
+                        if (!isLast)
+                          Divider(height: 1, thickness: 0.6, color: AirbnbTheme.border.withValues(alpha: 0.7)),
+                      ],
                     );
-                  }).toList(),
+                  }),
                 ),
               ),
               const SizedBox(height: 16),
             ],
 
-            // ── 图集缩略图网格（图集专属）──────────────────────
+            // ── 图集缩略图网格（图集与实况动图专属）──────────────────────
             if (item.isGallery) ...[
               Text(
-                '图集图片 (${item.images.length} 张)',
+                item.isLivePhoto
+                    ? '实况照片 (${item.images.length} 组)'
+                    : '图集图片 (${item.images.length} 张)',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -444,13 +643,53 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
                 ),
                 itemCount: item.images.length,
                 itemBuilder: (ctx, i) {
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(AirbnbTheme.radiusSm),
-                    child: CachedNetworkImage(
-                      imageUrl: item.images[i],
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(color: AirbnbTheme.border),
-                    ),
+                  final isItemLive = item.isLivePhoto &&
+                      i < item.livePhotoClips.length &&
+                      item.livePhotoClips[i].isNotEmpty;
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(AirbnbTheme.radiusSm),
+                        child: CachedNetworkImage(
+                          imageUrl: item.images[i],
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(color: AirbnbTheme.border),
+                          errorWidget: (_, __, ___) => Container(
+                            color: AirbnbTheme.border,
+                            child: const Icon(Icons.broken_image_rounded, size: 24),
+                          ),
+                        ),
+                      ),
+                      if (isItemLive)
+                        Positioned(
+                          top: 6,
+                          left: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.motion_photos_on_rounded, color: Colors.white, size: 10),
+                                SizedBox(width: 3),
+                                Text(
+                                  'LIVE',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   );
                 },
               ),

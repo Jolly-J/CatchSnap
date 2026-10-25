@@ -80,11 +80,19 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
 
-                // ── 提取 Web 登录 Cookie ────────────────────────────
+                // ── 提取与管理 Web 登录 Cookie（包含 HttpOnly 核心会话凭据） ──
                 "getCookies" -> {
                     val url = call.argument<String>("url") ?: ""
+                    android.webkit.CookieManager.getInstance().flush()
                     val cookie = android.webkit.CookieManager.getInstance().getCookie(url) ?: ""
                     result.success(cookie)
+                }
+                "clearCookies" -> {
+                    val cm = android.webkit.CookieManager.getInstance()
+                    cm.removeAllCookies {
+                        cm.flush()
+                        result.success(true)
+                    }
                 }
 
                 // ── 相册与媒体库安全归档 (后台 IO 线程异步写入，彻底杜绝主线程卡死) ──
@@ -153,6 +161,16 @@ class MainActivity : FlutterActivity() {
             values.clear()
             values.put(if (isVideo) MediaStore.Video.Media.IS_PENDING else MediaStore.Images.Media.IS_PENDING, 0)
             contentResolver.update(uri, values, null, null)
+
+            // 触发系统媒体库扫描，通知相册服务解析并索引 Motion Photo XMP
+            try {
+                android.media.MediaScannerConnection.scanFile(
+                    applicationContext,
+                    arrayOf(file.absolutePath),
+                    arrayOf(mimeType),
+                    null
+                )
+            } catch (_: Exception) {}
         } else {
             // Android 9 及以下方式
             val baseDir = Environment.getExternalStoragePublicDirectory(
