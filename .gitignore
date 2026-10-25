@@ -25,8 +25,15 @@ android/captures/
 android/gradlew
 android/gradlew.bat
 android/gradle/wrapper/gradle-wrapper.jar
+android/app/.cxx/
+**/android/app/.cxx/
 *.apk
 *.aab
+release/
+
+# ── 大体积外部逆向二进制归档 ──
+docs/ChatGPT_APK_*/
+docs/*.zip
 
 # ── IDE ──
 .idea/

@@ -1,0 +1,11 @@
+Static text checks only; Kotlin compilation, render QA, and device performance: NOT RUN.
+PASS: shape cached
+PASS: brush cached
+PASS: shadow cached
+PASS: shared theme policy
+PASS: solid edge supported
+PASS: shadow outside content clip
+PASS: radius not confused with elevation
+PASS: composer values
+PASS: no content/backdrop blur calls
+PASS: gradient marked as experiment

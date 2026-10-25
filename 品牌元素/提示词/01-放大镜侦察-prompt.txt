@@ -1,0 +1,25 @@
+生成方式：内置 image_gen
+参考图：/Users/jolin/Downloads/咔捕logo.png
+辅助参考：/Users/jolin/Downloads/霓虹萌趣机器人表情贴纸合集-4.png
+实际输出：1254 × 1254，RGBA PNG，透明通道范围 0–255。
+
+Use case: logo-brand.
+Create exactly ONE finished standalone image, not a grid, not a contact sheet, not multiple poses.
+Asset: 咔捕 app mascot, Prompt 01 — main logo, magnifying-glass discovery pose.
+Reference image 1 (咔捕logo.png) is the primary and authoritative mascot identity and material reference. Reference image 2 is a secondary reference for the same character family only; DO NOT reproduce its collage, background, or multiple characters. Re-render the character clearly and cleanly at high resolution; do not merely crop the collage.
+
+FIXED CHARACTER BASE (keep verbatim for this series):
+An original brand mascot, a cute chibi 3D toy-like robot character with a rounded capsule body. Main color is coral red / watermelon red with a smooth glossy plastic texture. The face is a large black glossy visor screen with simple glowing cyan electronic eyes. On top of the head are two rounded antenna-like ear petals, one larger and one smaller, colored red and cyan. The sides of the body have round ear-module pods with cyan glowing rims. A white triangular play-button emblem is placed on the chest. The limbs are very simplified, short and rounded, with white mitten-like hands and tiny white rounded feet. The style is polished, adorable, premium, brandable, toy-like, slightly futuristic, soft glossy highlights, high-quality 3D rendering, clean silhouette, suitable as an app mascot IP.
+Requirements: single character centered, square composition, transparent background, high resolution, crisp edges, no text, no watermark, no background scene.
+
+IDENTITY LOCK FROM PRIMARY REFERENCE:
+Match the existing mascot closely: large rounded red capsule silhouette, prominent thick soft ivory/white bezel around the dark glossy rounded visor, existing head/body proportions, large red top petal with smaller cyan petal tucked behind, round side pods with cyan rims and dark centers, stubby red arms and legs ending in white mitten hands and rounded white feet, white right-pointing triangular play emblem on the chest. Keep the exact friendly premium toy styling from reference 1; do not redesign it or add mechanical panels, fingers, clothing, or extra antennae.
+
+POSE / EXPRESSION / PROP FOR THIS IMAGE ONLY:
+Generate the main logo discovery pose. The robot's right hand (viewer's left) holds one large circular magnifying glass beside and close to its face, with a coral-red frame, short dark handle, and translucent blue glass. One cyan oval eye is visible and gently enlarged through the lens; the other eye is a playful cyan wink. A slight forward lean and one foot lifted create a lively searching/discovery action. Keep its chest play emblem plainly visible. Include only three small warm yellow discovery rays near the magnifying glass, matching the original visual language.
+
+OUTPUT:
+1:1 square canvas, aim for 2048 x 2048 high-resolution output. Full character and all props entirely within frame, centered with even transparent breathing room, no cropping. True transparent alpha background. Isolated polished 3D render, soft controlled highlights, clean crisp antialiased contours. No black/white/colored backdrop, no checkerboard drawn into the image, no ground plane, no cast background shadow, no sticker outline, no text, no watermark. app icon quality, clean silhouette, recognizable at small sizes, minimal extra details, brand mascot, sticker-like isolated render.
+
+Consistency note:
+Keep the exact same mascot identity, shape language, colors, head structure, black visor face, cyan glowing eyes, red-and-cyan top petals, white play-button emblem, and glossy toy-like material. Only change the pose, expression, and small props.

@@ -1,0 +1,16 @@
+生成方式：内置 image_gen；透明背景开启。
+
+Use case: identity-preserve.
+Edit reference image 1, the recently generated heart-hugging mascot. Reference image 2 is the original logo for identity confirmation. Produce exactly ONE image.
+
+FIXED CHARACTER BASE:
+An original brand mascot, a cute chibi 3D toy-like robot character with a rounded capsule body. Main color is coral red / watermelon red with a smooth glossy plastic texture. The face is a large black glossy visor screen with simple glowing cyan electronic eyes. On top of the head are two rounded antenna-like ear petals, one larger and one smaller, colored red and cyan. The sides of the body have round ear-module pods with cyan glowing rims. A white triangular play-button emblem is placed on the chest. The limbs are very simplified, short and rounded, with white mitten-like hands and tiny white rounded feet. The style is polished, adorable, premium, brandable, toy-like, slightly futuristic, soft glossy highlights, high-quality 3D rendering, clean silhouette, suitable as an app mascot IP.
+Requirements: single character centered, square composition, transparent background, high resolution, crisp edges, no text, no watermark, no background scene.
+
+TARGETED CORRECTION ONLY:
+In reference 1 the white triangular play emblem was incorrectly placed on the HEART PROP. Correct this. Make the heart modestly smaller and move it slightly down toward the belly and slightly toward the viewer's left. Both existing white mitten hands continue hugging it. The heart must have a smooth blank coral-pink surface with NO triangle, symbol or emblem. Place the single white right-pointing play emblem on the RED ROBOT CHEST, clearly visible between the visor and heart, physically attached to the robot body, never on the heart. Preserve the existing adorable smiling cyan eyes, head tilt, thick ivory visor bezel, top petals, round side pods, exact head/body proportions, limbs, lifted foot, two tiny floating pink hearts, colors, glossy toy material and lighting from reference 1. Change nothing else. Do not add hands or feet.
+
+OUTPUT:
+Square 1:1, one full character centered, high resolution, true transparent alpha background, clean silhouette, clean antialiased edges, clear transparent margins, no stray edge specks or noise, no background or shadow plane, no checkerboard painted into the image, no text, no watermark.
+Consistency note:
+Keep the exact same mascot identity, shape language, colors, head structure, black visor face, cyan glowing eyes, red-and-cyan top petals, white play-button emblem, and glossy toy-like material. Only change the pose, expression, and small props.

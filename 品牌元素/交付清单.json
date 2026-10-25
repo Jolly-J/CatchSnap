@@ -1,0 +1,142 @@
+{
+  "brand": "咔捕",
+  "generator": "内置 image_gen",
+  "image_count": 11,
+  "contents": "1 张主 Logo + 10 张动作形象；比心采用 v2 修正版。",
+  "items": [
+    {
+      "name": "01-放大镜侦察",
+      "image": "Logo/01-放大镜侦察.png",
+      "source_file": "01-放大镜侦察.png",
+      "prompt": "提示词/01-放大镜侦察-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "e0d82e9dac260304b801d5f5c5c93a8c803f7e01fb7d099d18392a90adbd0856"
+    },
+    {
+      "name": "02-挥手欢迎",
+      "image": "动作形象/02-挥手欢迎.png",
+      "source_file": "02-挥手欢迎.png",
+      "prompt": "提示词/02-挥手欢迎-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "7a7c9e8817d1b1f250f6e0c735744764c38b59b45801ca5796c46274d7772346"
+    },
+    {
+      "name": "03-点赞认可",
+      "image": "动作形象/03-点赞认可.png",
+      "source_file": "03-点赞认可.png",
+      "prompt": "提示词/03-点赞认可-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "489527c182b31fc8330ec8ae4323a150e02c6d1de16734d38dcbbd1b475e3ea6"
+    },
+    {
+      "name": "04-比心喜欢",
+      "image": "动作形象/04-比心喜欢.png",
+      "source_file": "04-比心喜欢.png",
+      "prompt": "提示词/04-比心喜欢-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "20f1cd7af9661b9e0b1db9b38ad674fb9287109d86d6228e6235cfb58527f9eb",
+      "selected_version": "v2"
+    },
+    {
+      "name": "05-惊喜发现",
+      "image": "动作形象/05-惊喜发现.png",
+      "source_file": "05-惊喜发现.png",
+      "prompt": "提示词/05-惊喜发现-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "d1c8fcf00b9468a9aa6834ebf5d666072889a1c544de3f037fe7aa9a83d429a7"
+    },
+    {
+      "name": "06-疑问求助",
+      "image": "动作形象/06-疑问求助.png",
+      "source_file": "06-疑问求助.png",
+      "prompt": "提示词/06-疑问求助-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "851bcb85c6272b49097f4dbc61014a3d791d51d048bd3889ed8a88aacd3a20de"
+    },
+    {
+      "name": "07-思考搜索",
+      "image": "动作形象/07-思考搜索.png",
+      "source_file": "07-思考搜索.png",
+      "prompt": "提示词/07-思考搜索-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "150f1544f2ea68897cd4cf5355a3deec533b84cafa5e2158b1ab8acc20bff055"
+    },
+    {
+      "name": "08-开心庆祝",
+      "image": "动作形象/08-开心庆祝.png",
+      "source_file": "08-开心庆祝.png",
+      "prompt": "提示词/08-开心庆祝-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "20dc9652a3e71646d5489ee7b81a88c33f6a6589073e6df18f0c606529841d89"
+    },
+    {
+      "name": "09-下载冲刺",
+      "image": "动作形象/09-下载冲刺.png",
+      "source_file": "09-下载冲刺.png",
+      "prompt": "提示词/09-下载冲刺-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "b85a9899522332157477c26637e24ea771d08b3f71cfc3f74604e9cf511a222d"
+    },
+    {
+      "name": "10-成功完成",
+      "image": "动作形象/10-成功完成.png",
+      "source_file": "10-成功完成.png",
+      "prompt": "提示词/10-成功完成-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "d82631f03a61994c130b172f9c19b1849603d848ac7b592948041c9595bc491a"
+    },
+    {
+      "name": "11-委屈失败",
+      "image": "动作形象/11-委屈失败.png",
+      "source_file": "11-委屈失败.png",
+      "prompt": "提示词/11-委屈失败-prompt.txt",
+      "width": 1254,
+      "height": 1254,
+      "mode": "RGBA",
+      "transparent": true,
+      "sha256": "91a2ac97fcc482300fe9cea7476cb6187d69f024c00838a8610966647296290b"
+    }
+  ],
+  "original_logo": {
+    "path": "Logo/咔捕logo-用户原版.png",
+    "sha256": "c8439cde7b39682896ea68fbe3b8be5058871b22f2f388f06a39bd6548884c37"
+  },
+  "references": [
+    {
+      "path": "参考原图/霓虹萌趣机器人表情贴纸合集-4.png",
+      "sha256": "daeb0270e0f284545ae0e201248604b620c44bd1b4afb8671f1b6c9a434ed360"
+    }
+  ],
+  "archive": "交付包/咔捕品牌形象-主Logo及10张动作.zip",
+  "history_note": "历史版本中的比心 v1 未选用；动作形象中的比心图为 v2 修正版。"
+}

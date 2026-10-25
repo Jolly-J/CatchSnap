@@ -1,132 +1,140 @@
+/**
+ * @file: MainActivity.kt
+ * @description: Android 主 Activity 与 Flutter 核心 MethodChannel 调度中心
+ * @author: Antigravity
+ * @version: 2.0.0
+ */
+
 package com.example.douyin_downloader
 
-import io.flutter.embedding.android.FlutterActivity
-import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodChannel
 import android.content.ContentValues
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.Settings
+import android.view.WindowManager
+import androidx.core.view.WindowCompat
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileInputStream
+import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.douyin_downloader/floating"
+    private val ioExecutor = Executors.newCachedThreadPool()
 
-    companion object {
-        // 暴露给 FloatingWindowService 直接调用
-        var instance: MainActivity? = null
-        fun invokeFlutter(method: String, args: Any?) {
-            instance?.flutterEngine?.dartExecutor?.binaryMessenger?.let {
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    MethodChannel(it, "com.example.douyin_downloader/floating")
-                        .invokeMethod(method, args)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // 原生级全屏 Edge-to-Edge 沉浸式适配（兼容 Android 10~15+ 挖孔屏与手势导航条）
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.statusBarColor = Color.TRANSPARENT
+        window.navigationBarColor = Color.TRANSPARENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                } else {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 }
             }
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        instance = this
-        // 处理 app 不在前台时积压的历史记录
-        flushPendingHistory()
-    }
-    override fun onDestroy() { super.onDestroy(); if (instance == this) instance = null }
-
-    /** 将 FloatingWindowService 积压的历史记录发给 Flutter */
-    private fun flushPendingHistory() {
-        val prefs = getSharedPreferences("floating_pending", android.content.Context.MODE_PRIVATE)
-        val pending = prefs.getString("pending_history", null) ?: return
-        prefs.edit().remove("pending_history").apply()
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            flutterEngine?.dartExecutor?.binaryMessenger?.let {
-                MethodChannel(it, CHANNEL).invokeMethod("addHistoryBatch", pending)
-            }
-        }, 500)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        // 启动时即注册高优实时活动渠道并移除旧版静默渠道
+        DownloadForegroundService.initChannel(this)
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
-                "hasOverlayPermission" -> {
-                    result.success(
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                            Settings.canDrawOverlays(this)
-                        else true
-                    )
-                }
-                "requestOverlayPermission" -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        startActivity(Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:$packageName")
-                        ))
-                    }
+                // ── Android 系统原生实时活动 / 流体云调度 (Foreground Service) ──
+                "startLiveActivity" -> {
+                    val title = call.argument<String>("title") ?: "正在下载媒体"
+                    val progress = call.argument<Int>("progress") ?: 0
+                    val speed = call.argument<String>("speed") ?: ""
+                    DownloadForegroundService.start(this, title, progress, speed)
                     result.success(null)
                 }
-                "startFloatingWindow" -> {
-                    val compactMode = call.argument<Boolean>("compact_mode") ?: false
-                    val intent = Intent(this, FloatingWindowService::class.java).apply {
-                        putExtra("compact_mode", compactMode)
-                    }
-                    startService(intent)
+                "updateLiveActivity" -> {
+                    val progress = call.argument<Int>("progress") ?: 0
+                    val speed = call.argument<String>("speed") ?: ""
+                    DownloadForegroundService.update(this, progress, speed)
                     result.success(null)
                 }
-                "stopFloatingWindow" -> {
-                    stopService(Intent(this, FloatingWindowService::class.java))
+                "stopLiveActivity" -> {
+                    val isSuccess = call.argument<Boolean>("isSuccess") ?: true
+                    val title = call.argument<String>("title") ?: ""
+                    DownloadForegroundService.stop(this, isSuccess, title)
                     result.success(null)
                 }
+
+                // ── 提取 Web 登录 Cookie ────────────────────────────
+                "getCookies" -> {
+                    val url = call.argument<String>("url") ?: ""
+                    val cookie = android.webkit.CookieManager.getInstance().getCookie(url) ?: ""
+                    result.success(cookie)
+                }
+
+                // ── 相册与媒体库安全归档 (后台 IO 线程异步写入，彻底杜绝主线程卡死) ──
                 "saveFileToGallery" -> {
-                    val filePath = call.argument<String>("filePath")!!
-                    val albumName = call.argument<String>("albumName") ?: "抖音下载"
-                    val fileName = call.argument<String>("fileName")!!
-                    try {
-                        saveToGallery(filePath, albumName, fileName)
-                        result.success(true)
-                    } catch (e: Exception) {
-                        result.error("SAVE_FAILED", e.message, null)
+                    val filePath = call.argument<String>("filePath")
+                    val albumName = call.argument<String>("albumName") ?: "咔捕"
+                    val fileName = call.argument<String>("fileName")
+
+                    if (filePath == null || fileName == null) {
+                        result.error("INVALID_ARGS", "文件路径或文件名为空", null)
+                        return@setMethodCallHandler
+                    }
+
+                    ioExecutor.execute {
+                        try {
+                            saveToGallery(filePath, albumName, fileName)
+                            runOnUiThread {
+                                result.success(true)
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                result.error("SAVE_FAILED", e.message, null)
+                            }
+                        }
                     }
                 }
-                "compactParseResult" -> {
-                    // 简洁模式现在完全在 Service 里处理，此方法保留兼容
-                    result.success(null)
-                }
-                "compactDownloadDone" -> {
-                    result.success(null)
-                }
-                "showFloatingButton" -> {
-                    FloatingWindowService.instance?.showFloatingButton()
-                    result.success(null)
-                }
-                "isFloatingButtonHidden" -> {
-                    result.success(FloatingWindowService.instance?.isFloatingButtonHidden() ?: false)
-                }
+
                 else -> result.notImplemented()
             }
         }
     }
 
+    /**
+     * 将临时文件安全写入 Android 系统 MediaStore 相册库
+     */
     private fun saveToGallery(filePath: String, albumName: String, fileName: String) {
         val file = File(filePath)
-        val isVideo = fileName.endsWith(".mp4")
+        val isVideo = fileName.endsWith(".mp4", ignoreCase = true)
         val mimeType = if (isVideo) "video/mp4" else "image/jpeg"
-        // 清理路径中 MediaStore 不支持的字符，保留斜杠（子目录分隔符）
-        val safePath = albumName.replace(Regex("[*?\"<>|]"), "_")
+        val safeAlbum = albumName.replace(Regex("[*?\"<>|]"), "_")
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10+ Scoped Storage 方式
             val collection = if (isVideo)
                 MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
             else
                 MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
 
             val baseDir = if (isVideo) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES
-            val relativePath = "$baseDir/$safePath"
+            val relativePath = "$baseDir/$safeAlbum"
 
             val values = ContentValues().apply {
                 put(if (isVideo) MediaStore.Video.Media.DISPLAY_NAME else MediaStore.Images.Media.DISPLAY_NAME, fileName)
@@ -136,79 +144,25 @@ class MainActivity : FlutterActivity() {
             }
 
             val uri = contentResolver.insert(collection, values)
-                ?: throw Exception("MediaStore insert 失败，路径: $relativePath")
+                ?: throw Exception("MediaStore 插入记录失败: $relativePath")
+
             contentResolver.openOutputStream(uri)?.use { output ->
                 FileInputStream(file).use { input -> input.copyTo(output) }
             }
+
             values.clear()
             values.put(if (isVideo) MediaStore.Video.Media.IS_PENDING else MediaStore.Images.Media.IS_PENDING, 0)
             contentResolver.update(uri, values, null, null)
         } else {
+            // Android 9 及以下方式
             val baseDir = Environment.getExternalStoragePublicDirectory(
                 if (isVideo) Environment.DIRECTORY_MOVIES else Environment.DIRECTORY_PICTURES
             )
-            // Android 9 及以下：safePath 可能含斜杠，逐级创建目录
-            val dir = File(baseDir, safePath)
+            val dir = File(baseDir, safeAlbum)
             if (!dir.exists()) dir.mkdirs()
             val dest = File(dir, fileName)
             file.copyTo(dest, overwrite = true)
             sendBroadcast(Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(dest)))
-        }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-
-        // 普通模式：读剪贴板
-        if (intent.getBooleanExtra("read_clipboard", false)) {
-            handler.postDelayed({
-                val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                val clipText = clipboard.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
-                if (clipText.isNotEmpty()) {
-                    flutterEngine?.dartExecutor?.binaryMessenger?.let {
-                        io.flutter.plugin.common.MethodChannel(it, CHANNEL)
-                            .invokeMethod("onClipboardText", clipText)
-                    }
-                }
-            }, 300)
-        }
-
-        // 简洁模式：解析
-        val compactText = intent.getStringExtra("compact_parse")
-        if (!compactText.isNullOrEmpty()) {
-            handler.postDelayed({
-                flutterEngine?.dartExecutor?.binaryMessenger?.let {
-                    io.flutter.plugin.common.MethodChannel(it, CHANNEL)
-                        .invokeMethod("onCompactParse", compactText)
-                }
-            }, 300)
-        }
-
-        // 简洁模式：下载
-        val compactUrl = intent.getStringExtra("compact_download")
-        if (!compactUrl.isNullOrEmpty()) {
-            val albumName = intent.getStringExtra("compact_album") ?: "便捷下载"
-            val isImages = intent.getBooleanExtra("compact_is_images", false)
-            handler.postDelayed({
-                flutterEngine?.dartExecutor?.binaryMessenger?.let {
-                    io.flutter.plugin.common.MethodChannel(it, CHANNEL)
-                        .invokeMethod("onCompactDownload", mapOf(
-                            "url" to compactUrl,
-                            "album" to albumName,
-                            "isImages" to isImages
-                        ))
-                }
-            }, 300)
-        }
-
-        // 兼容旧方式
-        val clipText = intent.getStringExtra("clipboard_text") ?: ""
-        if (clipText.isNotEmpty()) {
-            flutterEngine?.dartExecutor?.binaryMessenger?.let {
-                io.flutter.plugin.common.MethodChannel(it, CHANNEL)
-                    .invokeMethod("onClipboardText", clipText)
-            }
         }
     }
 }

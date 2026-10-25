@@ -1,12 +1,30 @@
+/**
+ * @file: home_screen.dart
+ * @description: 应用主页 (爱彼迎极简美学 + 大胶囊搜索 + 智能剪贴板唤起 + 顶部流体云灵动胶囊)
+ * @author: Antigravity
+ * @version: 2.0.0
+ */
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../app_theme.dart';
+import '../core/constants.dart';
+import '../models/platform_type.dart';
+import '../parsers/parser_factory.dart';
+import '../services/clipboard_service.dart';
+import '../services/cookie_service.dart';
+import '../services/download_task_manager.dart';
+import '../services/permission_service.dart';
 import '../utils/link_extractor.dart';
-import '../services/api_service.dart';
-import '../services/floating_window_service.dart';
-import '../services/settings_service.dart';
-import 'video_detail_screen.dart';
+import '../widgets/airbnb_button.dart';
+import '../widgets/airbnb_card.dart';
+import '../widgets/clipboard_prompt_sheet.dart';
+import '../widgets/floating_top_bar.dart';
+import '../widgets/snap_toast.dart';
 import 'history_screen.dart';
 import 'settings_screen.dart';
+import 'video_detail_screen.dart';
+import 'web_login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,386 +33,519 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final TextEditingController _controller = TextEditingController();
-  bool _isLoading = false;
-  DateTime? _lastBackPressed;
-
-  static const _primary = Color(0xFF1677FF);
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  final TextEditingController _inputCtrl = TextEditingController();
+  bool _isParsing = false;
+  bool _douyinCookieReady = false;
+  bool _xhsCookieReady = false;
 
   @override
   void initState() {
     super.initState();
-    FloatingWindowService.setClipboardHandler((text) {
+    WidgetsBinding.instance.addObserver(this);
+    _refreshCookieStatus();
+
+    // 冷启动首次渲染后，先主动申请通知与相册权限，再静默检测一次剪贴板
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await PermissionService.requestInitialPermissions();
       if (mounted) {
-        setState(() => _controller.text = text);
-        _parseVideo(replaceRoute: true);
+        _checkClipboardOnResume();
       }
     });
-    _restoreFloatingWindow();
-  }
-
-  Future<void> _restoreFloatingWindow() async {
-    final enabled = await SettingsService.getFloatingWindowEnabled();
-    if (enabled && await FloatingWindowService.hasOverlayPermission()) {
-      final compact = await SettingsService.getFloatingCompactMode();
-      FloatingWindowService.start(compactMode: compact);
-    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _inputCtrl.dispose();
     super.dispose();
   }
 
-  Future<bool> _onWillPop() async {
-    final now = DateTime.now();
-    if (_lastBackPressed == null ||
-        now.difference(_lastBackPressed!) > const Duration(seconds: 2)) {
-      _lastBackPressed = now;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('再按一次退出'),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return false;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 仅在用户切回前台时刻做单次检测，绝不在后台长轮询
+    if (state == AppLifecycleState.resumed) {
+      _checkClipboardOnResume();
+      _refreshCookieStatus();
     }
-    return true;
   }
 
-  Future<void> _parseVideo({bool replaceRoute = false}) async {
-    final text = _controller.text.trim();
-    final link = LinkExtractor.extractLink(text);
-    if (link == null) {
-      _showError('未找到有效的抖音视频链接');
+  Future<void> _refreshCookieStatus() async {
+    final dy = await CookieService.hasCookie(PlatformType.douyin);
+    final xhs = await CookieService.hasCookie(PlatformType.xiaohongshu);
+    if (mounted) {
+      setState(() {
+        _douyinCookieReady = dy;
+        _xhsCookieReady = xhs;
+      });
+    }
+  }
+
+  /// 进 App 时的单次剪贴板探查
+  Future<void> _checkClipboardOnResume() async {
+    final link = await ClipboardService.checkOnAppResume();
+    if (link != null && mounted) {
+      ClipboardPromptSheet.show(
+        context: context,
+        text: link,
+        onConfirm: () {
+          final clean = LinkExtractor.extractLink(link) ?? link;
+          _inputCtrl.text = clean;
+          _startParse(clean);
+        },
+      );
+    }
+  }
+
+  /// 执行本地免服解析
+  Future<void> _startParse([String? customInput]) async {
+    final text = (customInput ?? _inputCtrl.text).trim();
+    if (text.isEmpty) {
+      _showSnack('请先粘贴或输入分享链接');
       return;
     }
-    setState(() => _isLoading = true);
+
+    setState(() => _isParsing = true);
+    FocusScope.of(context).unfocus();
+
     try {
-      final videoInfo = await ApiService.parseVideo(link);
+      final cleanLink = LinkExtractor.extractLink(text) ?? text;
+      final mediaItem = await ParserFactory.parse(cleanLink);
+
       if (mounted) {
-        final route = MaterialPageRoute(
-          builder: (_) => VideoDetailScreen(videoInfo: videoInfo),
+        final startedDownload = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => VideoDetailScreen(item: mediaItem),
+          ),
         );
-        if (replaceRoute) {
-          // 悬浮窗触发：替换当前详情页，不叠加
-          Navigator.pushAndRemoveUntil(
-            context, route,
-            (r) => r.isFirst, // 保留首页，移除所有详情页
-          );
-        } else {
-          Navigator.push(context, route);
+        if (startedDownload == true && mounted) {
+          setState(() => _inputCtrl.clear());
         }
       }
     } catch (e) {
-      final msg = e.toString().replaceAll('Exception: ', '');
-      _showError(msg);
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('调试信息'),
-            content: SingleChildScrollView(child: SelectableText(msg)),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('关闭'))],
-          ),
-        );
-      }
+      _showSnack('解析失败: ${e.toString().replaceAll('Exception: ', '')}',
+          isError: true);
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isParsing = false);
+      }
     }
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+  void _showSnack(String msg, {bool isError = false, bool isSuccess = false}) {
+    if (!mounted) return;
+    if (isError) {
+      SnapToast.error(context, msg);
+    } else if (isSuccess) {
+      SnapToast.success(context, msg);
+    } else {
+      SnapToast.info(context, msg);
+    }
   }
 
   Future<void> _pasteFromClipboard() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (data?.text != null) setState(() => _controller.text = data!.text!);
+    final text = data?.text?.trim() ?? '';
+    if (text.isNotEmpty) {
+      final clean = LinkExtractor.extractLink(text) ?? text;
+      setState(() => _inputCtrl.text = clean);
+      _showSnack('已粘贴剪贴板内容', isSuccess: true);
+    } else {
+      _showSnack('剪贴板中暂无文字');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
-    final hasText = _controller.text.trim().isNotEmpty;
-
-    return WillPopScope(
-      onWillPop: _onWillPop,
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarIconBrightness: Brightness.dark,
-        ),
+    Theme.of(context);
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AirbnbTheme.themeModeNotifier,
+      builder: (context, _, __) => FloatingTopBarOverlayRegion(
         child: Scaffold(
-          backgroundColor: const Color(0xFFF2F6FF),
-          body: Column(
+          backgroundColor: AirbnbTheme.background,
+          body: Stack(
             children: [
-              // 顶部蓝色 header 区域（延伸到状态栏）
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1677FF), Color(0xFF4096FF)],
-                  ),
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(28),
-                    bottomRight: Radius.circular(28),
-                  ),
-                ),
+              Positioned.fill(child: _buildBody(context)),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _buildFloatingTopBar(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 悬浮顶部栏：左侧品牌标识通透浮动，右侧下载中心与设置收纳为悬浮胶囊
+  Widget _buildFloatingTopBar(BuildContext context) {
+    return FloatingTopBar(
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            AppConstants.brandLogo,
+            width: 38,
+            height: 38,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '咔捕',
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+              color: AirbnbTheme.textMain,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        FloatingPill(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ValueListenableBuilder<int>(
+                valueListenable:
+                    DownloadTaskManager.instance.activeCountNotifier,
+                builder: (context, activeCount, child) {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      FloatingPillIconButton(
+                        icon: activeCount > 0
+                            ? Icons.downloading_rounded
+                            : Icons.download_done_rounded,
+                        color: activeCount > 0
+                            ? AirbnbTheme.primary
+                            : AirbnbTheme.textMain,
+                        tooltip: '下载任务中心',
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                                builder: (_) => const HistoryScreen()),
+                          );
+                        },
+                      ),
+                      if (activeCount > 0)
+                        Positioned(
+                          top: 2,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AirbnbTheme.primary,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AirbnbTheme.primary.withOpacity(0.4),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            constraints: const BoxConstraints(
+                                minWidth: 16, minHeight: 16),
+                            child: Text(
+                              '$activeCount',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                height: 1.1,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+              FloatingPillIconButton(
+                icon: Icons.settings_outlined,
+                tooltip: '设置',
+                onPressed: () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                  _refreshCookieStatus();
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 主体内容：贯穿至状态栏后方，顶部预留悬浮栏高度，滑入顶部时由渐隐遮罩自然淡出
+  Widget _buildBody(BuildContext context) {
+    final mq = MediaQuery.paddingOf(context);
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        24.0,
+        FloatingTopBar.contentTopInset(context) + 4.0,
+        24.0,
+        16.0 + mq.bottom,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+
+          // ── 欢迎大标题与咔捕吉祥物 (Airbnb 经典排版) ────────
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: topPadding),
-                    // 顶栏
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 8),
-                          const Text('便捷下载',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            )),
-                          const Spacer(),
-                          IconButton(
-                            icon: const Icon(Icons.history_rounded, color: Colors.white),
-                            onPressed: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const HistoryScreen())),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.settings_rounded, color: Colors.white),
-                            onPressed: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                          ),
-                        ],
+                    Text(
+                      '极简探索\n高清无水印下载',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        color: AirbnbTheme.textMain,
+                        height: 1.25,
+                        letterSpacing: -0.6,
                       ),
                     ),
-                    // Logo + 副标题
-                    const SizedBox(height: 16),
-                    Container(
-                      width: 72, height: 72,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 16,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
+                    const SizedBox(height: 8),
+                    Text(
+                      '支持抖音 1080p 原画、小红书 4K 图集与实况无水印提取',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: AirbnbTheme.textSecondary,
+                        height: 1.4,
                       ),
-                      child: const Icon(Icons.download_rounded, color: _primary, size: 38),
                     ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      '粘贴链接，一键下载无水印内容',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
-                    ),
-                    const SizedBox(height: 28),
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
+              Image.asset(
+                _isParsing
+                    ? AppConstants.mascotSearching
+                    : AppConstants.mascotWelcome,
+                width: 82,
+                height: 82,
+                fit: BoxFit.contain,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
 
-              // 主体内容
+          // ── 核心搜索大胶囊输入卡片 ───────────────────────
+          AirbnbCard(
+            padding: const EdgeInsets.all(16),
+            borderRadius: AirbnbTheme.radiusLg,
+            child: Column(
+              children: [
+                TextField(
+                  controller: _inputCtrl,
+                  maxLines: 3,
+                  minLines: 2,
+                  style: TextStyle(color: AirbnbTheme.textMain, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: '在此粘贴抖音或小红书的分享口令或网址...',
+                    hintStyle: TextStyle(
+                      fontSize: 14,
+                      color: AirbnbTheme.textTertiary,
+                    ),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    filled: false,
+                    suffixIcon: _inputCtrl.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18),
+                            onPressed: () => setState(() => _inputCtrl.clear()),
+                          )
+                        : null,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _pasteFromClipboard,
+                      icon: const Icon(Icons.paste_rounded, size: 16),
+                      label: const Text('粘贴最新', style: TextStyle(fontSize: 13)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AirbnbTheme.textSecondary,
+                      ),
+                    ),
+                    if (_inputCtrl.text.isNotEmpty)
+                      TextButton(
+                        onPressed: () => setState(() => _inputCtrl.clear()),
+                        child: Text('清空',
+                            style: TextStyle(
+                                color: AirbnbTheme.textTertiary, fontSize: 13)),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                AirbnbButton(
+                  text: '开始极速解析',
+                  isLoading: _isParsing,
+                  onPressed: _isParsing ? null : () => _startParse(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // ── 平台高清状态快捷切换条 ─────────────────────────
+          Text(
+            '高清原画凭据状态',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AirbnbTheme.textMain,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
               Expanded(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(16, 20, 16, bottomPadding + 16),
+                child: _buildPlatformStatusBadge(
+                  platform: PlatformType.douyin,
+                  hasCookie: _douyinCookieReady,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildPlatformStatusBadge(
+                  platform: PlatformType.xiaohongshu,
+                  hasCookie: _xhsCookieReady,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+
+          // ── 贴心使用指南小卡片 ─────────────────────────────
+          AirbnbCard(
+            backgroundColor: AirbnbTheme.surface,
+            child: Row(
+              children: [
+                Image.asset(
+                  AppConstants.mascotDiscover,
+                  width: 50,
+                  height: 50,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 输入框卡片
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            TextField(
-                              controller: _controller,
-                              maxLines: 5,
-                              minLines: 3,
-                              style: const TextStyle(fontSize: 14, color: Colors.black87),
-                              decoration: InputDecoration(
-                                hintText: '粘贴抖音分享链接或分享口令...',
-                                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: BorderSide.none,
-                                ),
-                                filled: true,
-                                fillColor: Colors.white,
-                                contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            // 操作按钮行
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  TextButton.icon(
-                                    onPressed: _pasteFromClipboard,
-                                    icon: const Icon(Icons.content_paste_rounded, size: 16),
-                                    label: const Text('粘贴'),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: _primary,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  TextButton.icon(
-                                    onPressed: hasText
-                                        ? () => setState(() => _controller.clear())
-                                        : null,
-                                    icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                                    label: const Text('清空'),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: Colors.redAccent,
-                                      disabledForegroundColor: Colors.grey[300],
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                      Text(
+                        '咔捕免打扰自动侦测',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AirbnbTheme.textMain,
                         ),
                       ),
-
-                      const SizedBox(height: 16),
-
-                      // 解析按钮
-                      SizedBox(
-                        height: 52,
-                        child: ElevatedButton(
-                          onPressed: hasText && !_isLoading ? _parseVideo : null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _primary,
-                            disabledBackgroundColor: Colors.grey[200],
-                            disabledForegroundColor: Colors.grey[400],
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            elevation: hasText ? 4 : 0,
-                            shadowColor: _primary.withOpacity(0.4),
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 22, width: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5, color: Colors.white),
-                                )
-                              : const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.search_rounded, size: 20),
-                                    SizedBox(width: 8),
-                                    Text('解析视频',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                      )),
-                                  ],
-                                ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      // 使用说明
-                      _tipCard(),
-
-                      const SizedBox(height: 20),
-
-                      // 版权信息
-                      Center(
-                        child: Text(
-                          '© HACKFUN',
-                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                      const SizedBox(height: 4),
+                      Text(
+                        '在抖音/小红书复制链接后切回咔捕，系统将自动识别并弹出快速解析提示。',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AirbnbTheme.textSecondary,
+                          height: 1.4,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _tipCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04),
-            blurRadius: 8, offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildPlatformStatusBadge({
+    required PlatformType platform,
+    required bool hasCookie,
+  }) {
+    return AirbnbCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => WebLoginScreen(platform: platform)),
+        );
+        _refreshCookieStatus();
+      },
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: _primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.lightbulb_outline_rounded,
-                  size: 16, color: _primary),
-              ),
-              const SizedBox(width: 8),
-              const Text('使用说明',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-            ],
+          ClipOval(
+            child: platform.iconAsset != null
+                ? Image.asset(
+                    platform.iconAsset!,
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.cover,
+                  )
+                : Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: platform.brandColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.play_arrow_rounded,
+                        color: Colors.white, size: 18),
+                  ),
           ),
-          const SizedBox(height: 10),
-          _tipItem('复制抖音视频分享链接或口令'),
-          _tipItem('粘贴到输入框，点击解析'),
-          _tipItem('支持短视频和图集无水印下载'),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      platform.displayName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AirbnbTheme.textMain,
+                      ),
+                    ),
+                    if (hasCookie) ...[
+                      const SizedBox(width: 4),
+                      const Icon(Icons.verified_rounded,
+                          size: 14, color: AirbnbTheme.success),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  hasCookie ? '已解锁高清原画' : '访客画质·点击登录',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: hasCookie
+                        ? AirbnbTheme.success
+                        : AirbnbTheme.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
-
-  Widget _tipItem(String text) => Padding(
-    padding: const EdgeInsets.only(top: 6),
-    child: Row(
-      children: [
-        Container(
-          width: 5, height: 5,
-          decoration: const BoxDecoration(
-            color: _primary, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Text(text, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-      ],
-    ),
-  );
 }

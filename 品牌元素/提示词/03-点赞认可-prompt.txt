@@ -1,0 +1,23 @@
+生成方式：内置 image_gen；透明背景开启。
+
+Use case: logo-brand.
+Create exactly ONE finished standalone mascot image, not a grid, not a contact sheet, not multiple poses.
+Asset: a consistent 咔捕 app brand mascot action asset.
+Reference image 1 (咔捕logo.png) is the authoritative mascot identity, proportions, face bezel and material reference. Reference image 2 is a secondary reference of the character's action vocabulary only; DO NOT reproduce its collage or background.
+Create a fresh high-quality full character render in the requested new action; do not just copy the magnifying-glass pose.
+
+FIXED CHARACTER BASE (identical across every image):
+An original brand mascot, a cute chibi 3D toy-like robot character with a rounded capsule body. Main color is coral red / watermelon red with a smooth glossy plastic texture. The face is a large black glossy visor screen with simple glowing cyan electronic eyes. On top of the head are two rounded antenna-like ear petals, one larger and one smaller, colored red and cyan. The sides of the body have round ear-module pods with cyan glowing rims. A white triangular play-button emblem is placed on the chest. The limbs are very simplified, short and rounded, with white mitten-like hands and tiny white rounded feet. The style is polished, adorable, premium, brandable, toy-like, slightly futuristic, soft glossy highlights, high-quality 3D rendering, clean silhouette, suitable as an app mascot IP.
+Requirements: single character centered, square composition, transparent background, high resolution, crisp edges, no text, no watermark, no background scene.
+
+IDENTITY LOCK:
+Match reference 1: plump coral/watermelon red rounded capsule silhouette, large head merging into the short plump torso, prominent thick soft ivory-white bezel around a dark glossy rounded visor, large red top petal and smaller cyan petal tucked behind it, circular side pods with cyan rims and dark centers, very short red arms and legs, white mitten-like hands and tiny white rounded feet, a white right-pointing play triangle on the chest. Precisely maintain the existing proportions and soft glossy plastic material, friendly premium 3D toy style, smooth clean high-quality surfaces. No mechanical panels, clothing, extra limbs, additional antennae, realistic human hands or redesign.
+
+ONLY CHANGE THE POSE / EXPRESSION / SMALL PROPS AS FOLLOWS:
+A confident, cheerful thumbs-up approval pose. One cyan eye is a bright oval and the other is a playful wink. One white mitten hand forms a clearly readable rounded thumb pointing up, held beside the face, while the other hand rests naturally at the side. Keep the mitten simple, with one rounded thumb and a compact fist, no detailed human fingers. The body is upright and lively. Add one small yellow sparkle by the raised thumb. Keep the white chest play triangle visible. NO magnifying glass or other held prop.
+
+OUTPUT:
+1:1 square canvas, high resolution. Single full character centered, all limbs, top petals, props and small accents fully contained with comfortable transparent margins. True transparent alpha background. Polished 3D rendering, soft controlled studio highlights, clean antialiased contours. No backdrop, no drawn checkerboard, no ground plane, no cast background shadow, no colored haze around the silhouette, no sticker outline. No words, letters, numbers or watermark. App icon quality, clean silhouette, recognizable at small sizes, minimal extra details, brand mascot, sticker-like isolated render.
+
+Consistency note:
+Keep the exact same mascot identity, shape language, colors, head structure, black visor face, cyan glowing eyes, red-and-cyan top petals, white play-button emblem, and glossy toy-like material. Only change the pose, expression, and small props.

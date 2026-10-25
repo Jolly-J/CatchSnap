@@ -1,158 +1,72 @@
+/**
+ * @file: main.dart
+ * @description: 应用全局入口与主题调度 (爱彼迎轻量高效架构)
+ * @author: Antigravity
+ * @version: 2.0.0
+ * 
+ * 核心原则：
+ * 1. 权限按需调用 (Just-In-Time)，移除冷启动阻断式权限弹窗。
+ * 2. 挂载 Airbnb 全局设计系统规范主题。
+ */
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'app_theme.dart';
 import 'screens/home_screen.dart';
-import 'services/permission_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 沉浸式边缘到边缘系统导航栏与状态栏配置
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarIconBrightness: Brightness.dark,
-    systemNavigationBarDividerColor: Colors.transparent,
-  ));
-  runApp(const DouyinDownloaderApp());
+  await AirbnbTheme.initThemeMode();
+
+  runApp(const SnapAirApp());
 }
 
-class DouyinDownloaderApp extends StatelessWidget {
-  const DouyinDownloaderApp({super.key});
+class SnapAirApp extends StatefulWidget {
+  const SnapAirApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: '便捷下载',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1677FF),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          centerTitle: false,
-          titleTextStyle: TextStyle(
-            color: Colors.black87,
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-          ),
-          systemOverlayStyle: SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-            statusBarIconBrightness: Brightness.dark,
-            systemNavigationBarColor: Colors.transparent,
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1677FF),
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF1677FF), width: 2),
-          ),
-          filled: true,
-          fillColor: Colors.grey[50],
-        ),
-      ),
-      home: const PermissionGateway(),
-    );
-  }
+  State<SnapAirApp> createState() => _SnapAirAppState();
 }
 
-class PermissionGateway extends StatefulWidget {
-  const PermissionGateway({super.key});
-
-  @override
-  State<PermissionGateway> createState() => _PermissionGatewayState();
-}
-
-class _PermissionGatewayState extends State<PermissionGateway> {
-  bool _checking = true;
-  bool _granted = false;
-
+class _SnapAirAppState extends State<SnapAirApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    _check();
+    WidgetsBinding.instance.addObserver(this);
   }
 
-  Future<void> _check() async {
-    final granted = await PermissionService.hasStoragePermission();
-    setState(() { _checking = false; _granted = granted; });
-    if (granted) _goHome();
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
-  void _goHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
-    );
-  }
-
-  Future<void> _requestPermission() async {
-    final granted = await PermissionService.requestStoragePermission();
-    if (granted) {
-      _goHome();
-    } else {
-      setState(() => _granted = false);
+  @override
+  void didChangePlatformBrightness() {
+    AirbnbTheme.syncSystemUiOverlay();
+    if (AirbnbTheme.themeModeNotifier.value == ThemeMode.system && mounted) {
+      setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_checking) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Color(0xFF1677FF))),
-      );
-    }
-
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 100, height: 100,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1677FF).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.folder_open, size: 50, color: Color(0xFF1677FF)),
-              ),
-              const SizedBox(height: 32),
-              const Text('需要存储权限', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Text(
-                '下载视频和图片需要访问您的存储空间，请授予相关权限。',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: Colors.grey[600], height: 1.5),
-              ),
-              const SizedBox(height: 40),
-              ElevatedButton(
-                onPressed: _requestPermission,
-                child: const Text('去授权', style: TextStyle(fontSize: 16)),
-              ),
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: _goHome,
-                child: Text('暂时跳过', style: TextStyle(color: Colors.grey[500])),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AirbnbTheme.themeModeNotifier,
+      builder: (context, themeMode, _) {
+        AirbnbTheme.syncSystemUiOverlay();
+        return MaterialApp(
+          title: '咔捕',
+          debugShowCheckedModeBanner: false,
+          theme: AirbnbTheme.lightTheme,
+          darkTheme: AirbnbTheme.darkTheme,
+          themeMode: themeMode,
+          home: const HomeScreen(),
+        );
+      },
     );
   }
 }

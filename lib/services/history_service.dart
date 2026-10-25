@@ -1,79 +1,77 @@
+/**
+ * @file: history_service.dart
+ * @description: 媒体解析与下载历史归档持久化服务
+ * @author: Antigravity
+ * @version: 2.0.0
+ */
+
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/video_info.dart';
+import '../core/constants.dart';
+import '../models/media_item.dart';
 
 class HistoryService {
-  static const String _key = 'download_history';
+  static const int _maxHistoryLimit = 100;
 
-  Future<void> addHistory(VideoInfo video) async {
+  /// 添加记录并自动去重
+  static Future<void> addHistory(MediaItem item) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final historyJson = prefs.getString(_key);
-      List<dynamic> history = historyJson != null ? json.decode(historyJson) : [];
-      
-      // 去重：移除相同的记录
-      history = history.where((item) {
-        final existing = VideoInfo.fromJson(item as Map<String, dynamic>);
-        // 视频：通过 videoUrl 去重
-        if (video.isVideo) {
-          return existing.url != video.url;
-        }
-        // 图集：通过第一张图片 URL 去重
-        else {
-          final existingImages = existing.imageList;
-          final videoImages = video.imageList;
-          if (existingImages.isEmpty || videoImages.isEmpty) {
-            return true;
-          }
-          return existingImages[0] != videoImages[0];
-        }
-      }).toList();
-      
-      history.insert(0, video.toJson());
-      
-      if (history.length > 100) {
-        history = history.sublist(0, 100);
+      final historyJson = prefs.getString(AppConstants.keyDownloadHistory);
+      List<dynamic> list = historyJson != null ? json.decode(historyJson) : [];
+
+      // 依据唯一 ID 或标题进行去重
+      list.removeWhere((raw) {
+        final m = raw as Map<String, dynamic>;
+        return m['id'] == item.id || (m['title'] == item.title && item.title.isNotEmpty);
+      });
+
+      // 插入到首位
+      list.insert(0, item.toJson());
+
+      // 限制最大归档数量
+      if (list.length > _maxHistoryLimit) {
+        list = list.sublist(0, _maxHistoryLimit);
       }
-      
-      await prefs.setString(_key, json.encode(history));
-    } catch (e) {
-      // 优雅处理错误
-    }
+
+      await prefs.setString(AppConstants.keyDownloadHistory, json.encode(list));
+    } catch (_) {}
   }
 
-  Future<List<VideoInfo>> getHistory() async {
+  /// 获取历史列表
+  static Future<List<MediaItem>> getHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.reload(); // 强制从磁盘重新加载，确保能读到 Kotlin 侧写入的数据
-      final historyJson = prefs.getString(_key);
+      await prefs.reload();
+      final historyJson = prefs.getString(AppConstants.keyDownloadHistory);
       if (historyJson == null) return [];
-      
-      final List<dynamic> history = json.decode(historyJson);
-      return history.map((item) => VideoInfo.fromJson(item)).toList();
-    } catch (e) {
+
+      final List<dynamic> list = json.decode(historyJson);
+      return list.map((e) => MediaItem.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (_) {
       return [];
     }
   }
 
-  Future<void> clearHistory() async {
+  /// 删除单条历史
+  static Future<void> deleteHistory(String id) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_key);
-    } catch (e) {}
+      final historyJson = prefs.getString(AppConstants.keyDownloadHistory);
+      if (historyJson == null) return;
+
+      List<dynamic> list = json.decode(historyJson);
+      list.removeWhere((e) => (e as Map<String, dynamic>)['id'] == id);
+
+      await prefs.setString(AppConstants.keyDownloadHistory, json.encode(list));
+    } catch (_) {}
   }
 
-  Future<void> deleteHistory(int index) async {
+  /// 清空历史
+  static Future<void> clearHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final historyJson = prefs.getString(_key);
-      if (historyJson == null) return;
-      
-      List<dynamic> history = json.decode(historyJson);
-      history.removeAt(index);
-      
-      await prefs.setString(_key, json.encode(history));
-    } catch (e) {
-      // 优雅处理错误
-    }
+      await prefs.remove(AppConstants.keyDownloadHistory);
+    } catch (_) {}
   }
 }

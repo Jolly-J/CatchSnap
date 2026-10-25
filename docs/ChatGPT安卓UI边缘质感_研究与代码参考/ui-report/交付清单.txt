@@ -1,0 +1,11 @@
+ui-report目录可整体交付：
+- UI边缘质感补充报告.md（主报告）
+- 输入栏与共享Surface证据.md（主界面优先、参数和主题）
+- edge-findings.md（Pro卡片、Assistant渐变、shimmer）
+- shader-findings.md（外阴影、Haze及其他shader用途）
+- UI关键调用边.tsv、runtime-shader-constructors.tsv（短方法/偏移清单）
+- 本清单
+
+ui-evidence仅内部审计，含完整反编译类，不整体打包。
+前一阶段APK、decompiled、extracted、tools目录亦不交付。
+没有截图时，本报告提供候选和真实代码机制，不认定用户所指的唯一组件。
