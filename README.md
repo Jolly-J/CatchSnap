@@ -1,35 +1,37 @@
 <div align="center">
-  <img src="assets/brand/logo.png" width="96" height="96" alt="咔捕 CatchSnap Logo" />
-  <h1>咔捕 CatchSnap</h1>
-  <p>纯本地、免云端中转的多平台超清无水印媒体下载器</p>
-  <p>
-    <b>纯手机本地免服解析</b> · 
-    <b>爱彼迎温润设计体系</b> · 
-    <b>多线程分片 Range 跑满带宽</b> · 
-    <b>原生流体云灵动胶囊</b>
-  </p>
-  <p><em>不管是抖音超清原画、小红书高码率视频与无损图集，还是动态实况素材，一键捕获，直存相册。</em></p>
-</div>
+
+<img src="assets/brand/logo.png" alt="咔捕 CatchSnap Logo" width="112" height="112" style="border-radius: 26px;" />
+
+# 咔捕 CatchSnap
+
+**纯本地免服「抖音 / 小红书」超清无水印下载器 · 原画解析 · LivePhoto 实况 · 流体云灵动胶囊**
 
 <p align="center">
-  <a href="https://github.com/Jolly-J/CatchSnap/releases"><img src="https://img.shields.io/badge/Release-v2.0.0--beta1-FF385C.svg" alt="Release Version" /></a>
-  <img src="https://img.shields.io/badge/Platform-Android%2010%2B-blue.svg" alt="Platform: Android 10+" />
-  <img src="https://img.shields.io/badge/Framework-Flutter%203.x-02569B.svg" alt="Flutter 3.x" />
-  <img src="https://img.shields.io/badge/Language-Dart%20%7C%20Kotlin-orange.svg" alt="Dart & Kotlin" />
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
-  <img src="https://img.shields.io/badge/Privacy-100%25%20Local%20%26%20No%20Server-2ea44f.svg" alt="100% Local & No Server" />
+  <sub>Local Douyin & Xiaohongshu (RED) Media Downloader built with Flutter & Kotlin</sub>
 </p>
+
+[![Release](https://img.shields.io/badge/Release-v2.0.0--beta1-FF385C?style=flat-square)](https://github.com/Jolly-J/CatchSnap/releases)
+[![Platform](https://img.shields.io/badge/Platform-Android%2010%2B-blue?style=flat-square&logo=android)](https://developer.android.com/)
+[![Framework](https://img.shields.io/badge/Framework-Flutter%203.x-02569B?style=flat-square&logo=flutter)](https://flutter.dev/)
+[![Language](https://img.shields.io/badge/Language-Dart%20%7C%20Kotlin-orange?style=flat-square)](https://kotlinlang.org/)
+[![License](https://img.shields.io/badge/License-MIT-success?style=flat-square)](LICENSE)
+[![Privacy](https://img.shields.io/badge/Privacy-100%25%20Local-2ea44f?style=flat-square)](#-纯本地免服解析-privacy-first)
+
+*不管是抖音超清原画、小红书高码率视频与无损图集，还是动态实况素材，一键捕获，直存相册。*
+
+</div>
 
 ---
 
-## 为什么写这个小工具？
+## 💡 为什么做咔捕？
 
 平时在手机上保存抖音灵感视频或小红书实用图集，最让人头疼的往往不是找不到好内容，而是**下载与保存的体验极度糟糕**：
 
 1. **到处强弹广告与隐私泄漏**：市面上大部分所谓“去水印小程序”和解析网站，充斥着繁琐的观看广告诱导；更严重的是，它们要求把链接先传到未知的云端中转服务器，你的浏览足迹与个人鉴权 Cookie 随时面临泄露风险；
 2. **画质严重降级与阉割**：未经官方授权或未登录状态下，平台通常只下发 720p 甚至 540p 的高度压缩流，想要保存原画级 1080p 超清视频几乎不可能；
-3. **下载龟速、后台必断**：传统单线程单流下载在大体积视频或图集面前慢如蜗牛，切出 App 稍久就被系统直接杀死，必须重新排队；
-4. **剪贴板频繁骚扰**：一些工具后台常驻常读系统剪贴板，每次切换应用都冷不防弹个打扰提示。
+3. **小红书实况（LivePhoto）直接报废**：传统工具无法解析动态实况素材，保存出来变成了模糊的静态图甚至下载失败；
+4. **下载龟速、后台必断**：传统单线程单流下载在大体积视频或图集面前慢如蜗牛，切出 App 稍久就被系统直接杀死，必须重新排队；
+5. **剪贴板频繁骚扰**：一些工具后台常驻常读系统剪贴板，每次切换应用都冷不防弹个打扰提示。
 
 我就在想：**为什么不能有一个干干净净、纯本地跑的现代化下载器？**  
 “不建后端服务器、不转存用户凭据、用多线程直接在手机本地跑满带宽，切到后台还能通过灵动胶囊随时瞄一眼进度。”
@@ -38,24 +40,36 @@
 
 ---
 
+## ⚖️ 核心维度对比（为什么选择咔捕？）
+
+| 核心维度 | 市面去水印小程序 / 在线解析网 | 传统多媒体下载工具 | 🌟 **咔捕 CatchSnap** |
+| :--- | :--- | :--- | :--- |
+| **解析架构** | 强制云端服务器中转 | 云端中转或混杂 | **100% 手机端本地闭环解析，零中转** |
+| **用户隐私** | 搜集设备指纹、剪贴板与 Cookie | 行为追踪、回传下载历史 | **零数据上云，私有沙盒加密隔离** |
+| **视频画质** | 强制压缩为 720p / 540p | 视源站普通下发 | **支持官方 Web 鉴权，解锁 1080p 原画** |
+| **小红书实况** | 不支持（只能存静态图或直接报错） | 大多不支持 | **完美支持 LivePhoto 动态实况图无损提取** |
+| **下载引擎** | 单线程单连接，频繁超时断流 | 普通单流下载 | **1~8 线程 Range 分片并发拉取，跑满带宽** |
+| **使用体验** | 强制看 30s 广告、诱导付费会员 | 开屏弹窗、粗糙直角风格 | **0 广告、完全开源、Airbnb 温润设计体系** |
+| **后台状态感知** | 切到后台即断流 | 仅系统通知栏普通文本 | **流体云灵动胶囊 + 桌面悬浮岛 + 原生预测式返回** |
+
+---
+
 ## 📸 界面一览
 
-### 1. 经典视觉与日常交互
+### 1. 经典视觉与解析详情
 | 主页 (爱彼迎极简风格) | 折叠屏大屏深度自适应 | 剪贴板按需感知抽屉 |
 | :---: | :---: | :---: |
 | <img src="docs/screenshots/01_home.jpg" width="240" /> | <img src="docs/screenshots/02_fold_screen.jpg" width="240" /> | <img src="docs/screenshots/03_clipboard_prompt.jpg" width="240" /> |
 
-### 2. 超清无水印解析详情
-| 抖音超清无水印详情 | 小红书原画视频/图集解析 | Android 14 预测式返回动画 |
+| 抖音 1080p 超清无水印详情 | 小红书原画视频 / 图集解析 | Android 14 预测式返回动画 |
 | :---: | :---: | :---: |
 | <img src="docs/screenshots/04_douyin_detail.jpg" width="240" /> | <img src="docs/screenshots/05_xhs_detail.jpg" width="240" /> | <img src="docs/screenshots/predictive_back.gif" width="240" /> |
 
-### 3. 全维状态感知：流体云与实时通知
-| 悬浮灵动胶囊 (流体云) | 桌面/应用上方实时灵动岛 | 系统通知中心大卡片 |
+### 2. 全维状态感知与任务调度
+| 悬浮灵动胶囊 (流体云) | 桌面 / 应用上方实时灵动岛 | 系统通知中心大卡片 |
 | :---: | :---: | :---: |
 | <img src="docs/screenshots/06_fluid_cloud.jpg" width="240" /> | <img src="docs/screenshots/07_notification_bar.jpg" width="240" /> | <img src="docs/screenshots/08_notification_center.jpg" width="240" /> |
 
-### 4. 任务调度与精细偏好
 | 下载中 (多任务实时分片) | 已完成 (相册快速归档) | 设置与偏好控制台 |
 | :---: | :---: | :---: |
 | <img src="docs/screenshots/09_tasks_downloading.jpg" width="240" /> | <img src="docs/screenshots/10_tasks_completed.jpg" width="240" /> | <img src="docs/screenshots/11_settings_1.jpg" width="240" /> |
@@ -67,7 +81,7 @@
 ### 🛡️ 1. 纯本地免服解析 (Privacy First)
 * **零外部后端依赖**：彻底剥离自建服务器，短链还原、重定向追踪、页面 DOM 与 API 数据清洗全部在手机本地运行，用户凭据与下载历史绝不上云；
 * **抖音 (Douyin) 深度解析**：支持口令、短链接（`v.douyin.com`）与网页长链，精准提取 1080p 超清无水印原画视频、音频原声与原图；
-* **小红书 (Xiaohongshu) 全能解析**：支持 `xhslink.com` 短链解析、多码率自适应视频流、高清无水印图集，并支持实况动态素材识别。
+* **小红书 (Xiaohongshu) 全能解析**：支持 `xhslink.com` 短链解析、多码率自适应视频流、高清无损图集，并支持动态实况素材（LivePhoto）识别与无损分离。
 
 ### 🔑 2. 内置官方安全 Web 登录，解锁高清 Cookie
 * **官方移动端鉴权**：在设置或首页可一键呼出平台官方登录页（支持验证码或扫码安全登录）；
@@ -88,6 +102,14 @@
 * **现代触感交互**：集成 **Android 14+ 预测式返回动画 (Predictive Back)**，全屏手势滑动返回时丝滑缩放预览；
 * **折叠屏内屏自适应**：自动适配展开态大屏，双列多卡片自适应流式排版；
 * **合规与省电优先**：严禁后台轮询系统剪贴板，仅在冷启动或用户切回前台瞬间进行单次轻量探查，并以底部模态抽屉优雅询问，杜绝电量偷跑。
+
+---
+
+## 📱 3 步快速上手（开箱即用）
+
+1. **复制分享口令 / 链接**：在抖音或小红书 App 中点击分享，复制视频或图集的分享口令或网址；
+2. **打开咔捕 CatchSnap**：应用会自动感知剪贴板内容，轻点底部弹出的感知抽屉即可秒级解析；
+3. **选择画质并极速保存**：点击选择 1080p 超清原画、音频原声或 LivePhoto，分片并发直存系统相册！
 
 ---
 
@@ -182,7 +204,7 @@ lib/
 
 ---
 
-## 🚀 快速上手
+## 🚀 获取与构建
 
 ### 方式一：直接下载安装包（推荐）
 
