@@ -10,7 +10,7 @@
   <sub>Local Douyin & Xiaohongshu (RED) Media Downloader built with Flutter & Kotlin</sub>
 </p>
 
-[![Release](https://img.shields.io/badge/Release-v2.0.0--beta1-FF385C?style=flat-square)](https://github.com/Jolly-J/CatchSnap/releases)
+[![Release](https://img.shields.io/badge/Release-v1.0.0-FF385C?style=flat-square)](https://github.com/Jolly-J/CatchSnap/releases/tag/v1.0.0)
 [![Platform](https://img.shields.io/badge/Platform-Android%2010%2B-blue?style=flat-square&logo=android)](https://developer.android.com/)
 [![Framework](https://img.shields.io/badge/Framework-Flutter%203.x-02569B?style=flat-square&logo=flutter)](https://flutter.dev/)
 [![Language](https://img.shields.io/badge/Language-Dart%20%7C%20Kotlin-orange?style=flat-square)](https://kotlinlang.org/)
@@ -210,8 +210,12 @@ lib/
 
 您可以直接前往 [GitHub Releases](https://github.com/Jolly-J/CatchSnap/releases) 获取已签名的最新发布版 APK 安装包：
 
-- 📦 **最新版发布页**：[GitHub Releases / v2.0.0-beta1](https://github.com/Jolly-J/CatchSnap/releases)
+- 📦 **正式版发布页**：[GitHub Releases / v1.0.0](https://github.com/Jolly-J/CatchSnap/releases/tag/v1.0.0)
 - 📲 **系统要求**：Android 10.0+（推荐 Android 14+ 享受最佳预测式返回与悬浮流体云手感）
+
+1.0.0 是咔捕正式发布版本，构建号为 2，使用新的专用发布证书。此前的 `2.0.0-beta1` 使用调试证书，无法直接覆盖安装；已有测试版用户需自行保留所需资料后卸载重装，卸载会清除应用本地配置、登录会话和下载记录。
+
+桌面图标采用暖白底，包含 Android 自适应、单色主题和旧系统兼容资源。品牌原图、商店素材及规范说明统一保存在 [品牌元素](品牌元素/README.md)。
 
 ### 方式二：从源码构建
 
@@ -228,7 +232,11 @@ flutter pub get
 # 3. 连接 Android 真机或模拟器运行
 flutter run
 
-# 4. 编译 Release 发布版 APK
+# 4. 首次发布前，按示例配置自己的签名证书（不要提交密钥或密码）
+cp android/key.properties.example android/key.properties
+# 编辑 android/key.properties 并将自己的证书放到对应位置
+
+# 5. 编译 Release 发布版 APK
 flutter build apk --release --no-tree-shake-icons
 ```
 

@@ -6,8 +6,8 @@
   "items": [
     {
       "name": "01-放大镜侦察",
-      "image": "Logo/01-放大镜侦察.png",
-      "source_file": "01-放大镜侦察.png",
+      "image": "Logo/应用logo.png",
+      "source_file": "应用logo.png",
       "prompt": "提示词/01-放大镜侦察-prompt.txt",
       "width": 1254,
       "height": 1254,
@@ -138,5 +138,12 @@
     }
   ],
   "archive": "交付包/咔捕品牌形象-主Logo及10张动作.zip",
-  "history_note": "历史版本中的比心 v1 未选用；动作形象中的比心图为 v2 修正版。"
+  "history_note": "历史版本中的比心 v1 未选用；动作形象中的比心图为 v2 修正版。",
+  "system_icons": {
+    "directory": "系统图标",
+    "readme": "系统图标/README.md",
+    "validation": "系统图标/验证结果.json",
+    "package": "交付包/咔捕系统图标-20261027.zip",
+    "background": "#FFF8F5"
+  }
 }

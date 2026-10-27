@@ -1,0 +1,298 @@
+{
+  "date": "2026-10-27",
+  "background": "#FFF8F5",
+  "all_passed": true,
+  "checks": [
+    {
+      "check": "旧系统资源尺寸",
+      "passed": true,
+      "details": "48/72/96/144/192，普通及圆形图标共 10 张"
+    },
+    {
+      "check": "商店 kabu-google-play-512.png",
+      "passed": true,
+      "details": {
+        "size": 512,
+        "bytes": 219568,
+        "byte_limit": 1024000,
+        "background": "opaque #FFF8F5",
+        "sRGB": true
+      }
+    },
+    {
+      "check": "商店 kabu-xiaomi-oppo-512.png",
+      "passed": true,
+      "details": {
+        "size": 512,
+        "bytes": 219568,
+        "byte_limit": 1000000,
+        "background": "opaque #FFF8F5",
+        "sRGB": true
+      }
+    },
+    {
+      "check": "商店 kabu-vivo-512.png",
+      "passed": true,
+      "details": {
+        "size": 512,
+        "bytes": 219568,
+        "byte_limit": 500000,
+        "background": "opaque #FFF8F5",
+        "sRGB": true
+      }
+    },
+    {
+      "check": "商店 kabu-honor-512.jpg",
+      "passed": true,
+      "details": {
+        "size": 512,
+        "bytes": 53540,
+        "byte_limit": 200000,
+        "background": "opaque #FFF8F5",
+        "sRGB": true
+      }
+    },
+    {
+      "check": "商店 kabu-huawei-harmonyos-216.png",
+      "passed": true,
+      "details": {
+        "size": 216,
+        "bytes": 48946,
+        "byte_limit": 3000000,
+        "background": "opaque #FFF8F5",
+        "sRGB": true
+      }
+    },
+    {
+      "check": "商店 kabu-master-1024.png",
+      "passed": true,
+      "details": {
+        "size": 1024,
+        "bytes": 765295,
+        "byte_limit": 3000000,
+        "background": "opaque #FFF8F5",
+        "sRGB": true
+      }
+    },
+    {
+      "check": "Google Play PNG 格式",
+      "passed": true,
+      "details": "IHDR=8 bit × RGBA，32 位 PNG，sRGB 标记存在"
+    },
+    {
+      "check": "安全圆 ic_launcher_foreground.png",
+      "passed": true,
+      "details": {
+        "all_nonzero_alpha_radius_px": 131.919,
+        "ideal_radius_px": 132,
+        "antialias_tolerance_px": 1
+      }
+    },
+    {
+      "check": "安全圆 ic_launcher_monochrome.png",
+      "passed": true,
+      "details": {
+        "all_nonzero_alpha_radius_px": 126.406,
+        "ideal_radius_px": 132,
+        "antialias_tolerance_px": 1
+      }
+    },
+    {
+      "check": "版本资源配置",
+      "passed": true,
+      "details": "v26 前景/背景；v33 前景/背景/单色；icon 和 roundIcon 均配置"
+    },
+    {
+      "check": "项目接入一致性",
+      "passed": true,
+      "details": {
+        "resource_count": 17,
+        "manifest": "icon + roundIcon"
+      }
+    },
+    {
+      "check": "AAPT2 编译与链接",
+      "passed": true,
+      "details": "35.0.0：全项目 res 编译通过；独立图标资源编译、链接至验证 APK 通过"
+    }
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4352,
+      "sha256": "599475c834617cd56de54bb09197bf2123605d53b476e68929e33db069b29e66"
+    },
+    {
+      "path": "android/res/drawable/ic_launcher_monochrome.xml",
+      "bytes": 2279,
+      "sha256": "b02f2deb19444e93cc0f4f37a5eb35c16120e82b99cfeb6970330da9fc491a72"
+    },
+    {
+      "path": "android/res/drawable-nodpi/ic_launcher_foreground.png",
+      "bytes": 89826,
+      "sha256": "8fadeb1e0cbedcb08967ef9fe148b6f4660790770cd72b3b4bfa94089cd5edfd"
+    },
+    {
+      "path": "android/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "bytes": 264,
+      "sha256": "918dc746a54f2c0c223d6004dcaed5051a812b75bbf3aba94f23b58d0144fbbb"
+    },
+    {
+      "path": "android/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+      "bytes": 264,
+      "sha256": "918dc746a54f2c0c223d6004dcaed5051a812b75bbf3aba94f23b58d0144fbbb"
+    },
+    {
+      "path": "android/res/mipmap-anydpi-v33/ic_launcher.xml",
+      "bytes": 331,
+      "sha256": "9a392913828367b9f8d32b6c401792500db88b9804476d4e7f002a1bef1912d1"
+    },
+    {
+      "path": "android/res/mipmap-anydpi-v33/ic_launcher_round.xml",
+      "bytes": 331,
+      "sha256": "9a392913828367b9f8d32b6c401792500db88b9804476d4e7f002a1bef1912d1"
+    },
+    {
+      "path": "android/res/mipmap-hdpi/ic_launcher.png",
+      "bytes": 7813,
+      "sha256": "0143dc7e8abdec48f73f169c6314ae75e42c0302144ba196b50e5170bafcb81a"
+    },
+    {
+      "path": "android/res/mipmap-hdpi/ic_launcher_round.png",
+      "bytes": 9085,
+      "sha256": "93a2edd28eb844de27622354aa393d6e0eb13ccfcf0555adfb2956df7cc4f6ca"
+    },
+    {
+      "path": "android/res/mipmap-mdpi/ic_launcher.png",
+      "bytes": 4009,
+      "sha256": "6d1ecf8c248179f702fc18e684e0fdaf3fd992cd305cea01abcccfd8b54f0f73"
+    },
+    {
+      "path": "android/res/mipmap-mdpi/ic_launcher_round.png",
+      "bytes": 4638,
+      "sha256": "6c689981183fdfb4d0ba2771f16f811a1fd80ae21bea001b02cc9397d77b7db0"
+    },
+    {
+      "path": "android/res/mipmap-xhdpi/ic_launcher.png",
+      "bytes": 12550,
+      "sha256": "9cdf9f7d438067bfbcd3335fb9a73940600e2885f543a03919ed83902c06864b"
+    },
+    {
+      "path": "android/res/mipmap-xhdpi/ic_launcher_round.png",
+      "bytes": 14386,
+      "sha256": "568dfaa65d191f35fa5c0fe597e549208ccd75d6ff77c4ddb5fc1d72adbfa265"
+    },
+    {
+      "path": "android/res/mipmap-xxhdpi/ic_launcher.png",
+      "bytes": 24817,
+      "sha256": "df89cbedfe1c297ef3288fab511af2aeca5f7fb86bf119a9f27a49d94d98d473"
+    },
+    {
+      "path": "android/res/mipmap-xxhdpi/ic_launcher_round.png",
+      "bytes": 27738,
+      "sha256": "ed3ec51bc4ec0c77e9671edbbed8fd6796b23637eeaf3e091ee8b080335ac6d4"
+    },
+    {
+      "path": "android/res/mipmap-xxxhdpi/ic_launcher.png",
+      "bytes": 39869,
+      "sha256": "b912d55e31f96739db3462fcdd6a0a789fd1bf50c4cef9aa96a2532a4f94af5b"
+    },
+    {
+      "path": "android/res/mipmap-xxxhdpi/ic_launcher_round.png",
+      "bytes": 43895,
+      "sha256": "dbe1a12ad9e21646b0774b89505863a46dfb8724acd2326ac29b3ed1f684c650"
+    },
+    {
+      "path": "android/res/values/ic_launcher_colors.xml",
+      "bytes": 114,
+      "sha256": "9a49fc287a9f29be0998dd8102c4314b67bfa16d6ba4b306ba08d2c481b1cfa6"
+    },
+    {
+      "path": "generate.swift",
+      "bytes": 11115,
+      "sha256": "6ceb8da0239a9c085d45b56bf88208345166430dd6e425ffbef7929d2391b82e"
+    },
+    {
+      "path": "geometry.json",
+      "bytes": 241,
+      "sha256": "4d6ce6e06c8983e8cfbf985424a857c4d3d304b5c1d6e1366ce1588679a13417"
+    },
+    {
+      "path": "商店/kabu-google-play-512.png",
+      "bytes": 219568,
+      "sha256": "b8367d890a2a8c98ea08d537bcbc95fa77dbfcd2f46f298898144ff77859caec"
+    },
+    {
+      "path": "商店/kabu-honor-512.jpg",
+      "bytes": 53540,
+      "sha256": "33ec4bb8163f6453a5d1a46562e45ea16db14746c1692e190b5d207584fbf19c"
+    },
+    {
+      "path": "商店/kabu-huawei-harmonyos-216.png",
+      "bytes": 48946,
+      "sha256": "1c18819a3af6c6aae885c46b2a17a5cbbf3c7c8648880c330ff4f1a5e2c8d215"
+    },
+    {
+      "path": "商店/kabu-master-1024.png",
+      "bytes": 765295,
+      "sha256": "0e87f98a32287ce1b43b1e9e4304528bc01dbcc82dc9a6ef8649877b272d0170"
+    },
+    {
+      "path": "商店/kabu-vivo-512.png",
+      "bytes": 219568,
+      "sha256": "b8367d890a2a8c98ea08d537bcbc95fa77dbfcd2f46f298898144ff77859caec"
+    },
+    {
+      "path": "商店/kabu-xiaomi-oppo-512.png",
+      "bytes": 219568,
+      "sha256": "b8367d890a2a8c98ea08d537bcbc95fa77dbfcd2f46f298898144ff77859caec"
+    },
+    {
+      "path": "源文件/ic_launcher_background.png",
+      "bytes": 4315,
+      "sha256": "3cb46a458a7a67b68c212884282254b11ab87559466f5b7269736d537dd7bc1d"
+    },
+    {
+      "path": "源文件/ic_launcher_foreground.png",
+      "bytes": 89826,
+      "sha256": "8fadeb1e0cbedcb08967ef9fe148b6f4660790770cd72b3b4bfa94089cd5edfd"
+    },
+    {
+      "path": "源文件/ic_launcher_monochrome.png",
+      "bytes": 12520,
+      "sha256": "ed15b8c32cce6ddd414728dcc0e97267c324adf1dba825c0da415b9651dabfdb"
+    },
+    {
+      "path": "源文件/ic_launcher_monochrome.xml",
+      "bytes": 2279,
+      "sha256": "b02f2deb19444e93cc0f4f37a5eb35c16120e82b99cfeb6970330da9fc491a72"
+    },
+    {
+      "path": "预览/图标适配总览.png",
+      "bytes": 247318,
+      "sha256": "2d9be542ce1384523c48649c0cd9a456088cb430d57b925fa912a32f2ebd4c78"
+    }
+  ],
+  "not_verified": [
+    "各厂商真机桌面与主题引擎",
+    "商店后台上传及审核"
+  ],
+  "device_observation": "adb devices 返回空设备列表",
+  "preview_type": "导出资源的模拟蒙版预览，非真机截图",
+  "apk_release_validation": {
+    "version": "1.0.0",
+    "version_code": 2,
+    "artifact": "CatchSnap-v1.0.0.apk",
+    "sha256": "f26bb397e0f82d4cb442993cc558b6bf0b85dbead20de2d4cc80184824ff739d",
+    "certificate_subject": "CN=CatchSnap Release, O=CatchSnap, C=CN",
+    "certificate_sha256": "7d09994e2667a3c078ae329be78a1dc32f6f0dd40fb54b75fd40a0fafce7955b",
+    "release_build": true,
+    "debuggable": false,
+    "packaged_foreground_pixels_match": true,
+    "adaptive_layers_v26_v33_present": true,
+    "flutter_tests_passed": 6,
+    "static_analysis_errors": 0,
+    "static_analysis_warnings": 0,
+    "static_analysis_deprecation_infos": 14
+  }
+}

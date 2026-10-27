@@ -4,6 +4,19 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+// 正式发布使用本地专用签名；密钥和密码文件不进入版本控制。
+def releaseSigningProperties = new Properties()
+def releaseSigningFile = rootProject.file("key.properties")
+if (releaseSigningFile.exists()) {
+    releaseSigningFile.withInputStream { releaseSigningProperties.load(it) }
+}
+def releaseRequested = gradle.startParameter.taskNames.any {
+    it.toLowerCase().contains("release")
+}
+if (releaseRequested && !releaseSigningFile.exists()) {
+    throw new GradleException("正式发布需要 android/key.properties，请参考 android/key.properties.example 配置专用签名。")
+}
+
 android {
     namespace "com.example.douyin_downloader"
     compileSdk 35
@@ -25,13 +38,24 @@ android {
         applicationId "com.example.douyin_downloader"
         minSdk 21
         targetSdk 35
-        versionCode 1
-        versionName "2.0.0-beta1"
+        versionCode flutter.versionCode
+        versionName flutter.versionName
+    }
+
+    signingConfigs {
+        release {
+            if (releaseSigningFile.exists()) {
+                storeFile file(releaseSigningProperties['storeFile'])
+                storePassword releaseSigningProperties['storePassword']
+                keyAlias releaseSigningProperties['keyAlias']
+                keyPassword releaseSigningProperties['keyPassword']
+            }
+        }
     }
 
     buildTypes {
         release {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
     }
 

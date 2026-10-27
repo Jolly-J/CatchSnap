@@ -1,0 +1,6 @@
+# 复制为 android/key.properties 后填入本地发布证书配置。
+# storeFile 相对于 android/app；证书和密码不得提交至 Git。
+storeFile=release.keystore
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=catchsnap
+keyPassword=YOUR_KEY_PASSWORD

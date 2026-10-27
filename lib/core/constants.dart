@@ -8,7 +8,7 @@
 class AppConstants {
   // ── 应用基本信息 ──────────────────────────────────────────────
   static const String appName = '咔捕';
-  static const String appVersion = '2.0.0-beta1';
+  static const String appVersion = '1.0.0';
 
   // ── 咔捕品牌与吉祥物动作形象资源 ──────────────────────────────
   static const String brandLogo = 'assets/brand/logo.png';           // 01-放大镜侦察 (主Logo)
